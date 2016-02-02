@@ -1,6 +1,6 @@
 package br.com.gamemods.mychunks.data.api;
 
-import br.com.gamemods.mychunks.data.bean.ClaimedChunk;
+import br.com.gamemods.mychunks.data.state.ClaimedChunk;
 import com.flowpowered.math.vector.Vector3i;
 
 import java.util.Optional;

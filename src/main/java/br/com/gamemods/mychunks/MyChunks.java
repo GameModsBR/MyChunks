@@ -1,7 +1,11 @@
 package br.com.gamemods.mychunks;
 
+import static br.com.gamemods.mychunks.Util.*;
+
 import br.com.gamemods.mychunks.data.api.DataStorage;
-import br.com.gamemods.mychunks.data.bean.ClaimedChunk;
+import br.com.gamemods.mychunks.data.state.ClaimedChunk;
+import br.com.gamemods.mychunks.data.state.Permission;
+import br.com.gamemods.mychunks.data.state.PlayerName;
 import com.flowpowered.math.vector.Vector3i;
 import com.google.inject.Inject;
 import org.slf4j.Logger;
@@ -13,9 +17,12 @@ import org.spongepowered.api.data.Transaction;
 import org.spongepowered.api.entity.living.player.Player;
 import org.spongepowered.api.event.Listener;
 import org.spongepowered.api.event.block.ChangeBlockEvent;
+import org.spongepowered.api.event.cause.NamedCause;
 import org.spongepowered.api.event.filter.cause.First;
+import org.spongepowered.api.event.filter.cause.Named;
 import org.spongepowered.api.event.game.state.GameStartingServerEvent;
 import org.spongepowered.api.event.world.LoadWorldEvent;
+import org.spongepowered.api.event.world.SaveWorldEvent;
 import org.spongepowered.api.event.world.UnloadWorldEvent;
 import org.spongepowered.api.event.world.chunk.LoadChunkEvent;
 import org.spongepowered.api.event.world.chunk.UnloadChunkEvent;
@@ -27,7 +34,6 @@ import org.spongepowered.api.world.World;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
 
 @Plugin(id="MyChunks", name = "MyChunks", version = "1.0-SNAPSHOT")
 public class MyChunks
@@ -48,7 +54,9 @@ public class MyChunks
                     Location<World> location = player.getLocation();
                     UUID worldId = location.getExtent().getUniqueId();
                     Vector3i chunkPosition = blockToChunk(location.getPosition().toInt());
-                    getChunkMap(worldId).get().put(chunkPosition, new ClaimedChunk(worldId, chunkPosition));
+                    ClaimedChunk claimedChunk = new ClaimedChunk(worldId, chunkPosition);
+                    claimedChunk.setOwner(new PlayerName(player.getUniqueId(), player.getName()));
+                    getChunkMap(worldId).get().put(chunkPosition, claimedChunk);
                     player.sendMessage(Text.of("The chunk "+chunkPosition+" is now protected"));
                     return CommandResult.success();
                 })
@@ -61,6 +69,13 @@ public class MyChunks
     @Listener
     public void onModifyBlock(ChangeBlockEvent event, @First Player player)
     {
+        logger.info("Call: "+event.getClass());
+        if(event.getCause().get(NamedCause.NOTIFIER, Player.class).map(p -> p.equals(player)).orElse(false))
+        {
+            logger.info("Player cause is notifier.");
+            return;
+        }
+
         getChunkMap(event.getTargetWorld()).ifPresent(subMap -> {
             Set<Vector3i> checkedChunks = new HashSet<>(2);
 
@@ -71,7 +86,7 @@ public class MyChunks
                     continue;
 
                 ClaimedChunk claimedChunk = subMap.get(chunkPosition);
-                if (claimedChunk != null && !claimedChunk.checkModify(player))
+                if (claimedChunk != null && !claimedChunk.check(Permission.MODIFY, player))
                 {
                     logger.info("Chunk modification cancelled: "+chunkPosition+" "+event.getCause());
                     event.setCancelled(true);
@@ -82,6 +97,13 @@ public class MyChunks
                 logger.info("Chunk modification allowed: "+chunkPosition+" "+event);
             }
         });
+        logger.info("Return");
+    }
+
+    @Listener
+    public void on(SaveWorldEvent event)
+    {
+        logger.info("World save: "+event.getTargetWorld().getName());
     }
 
     @Listener
@@ -139,10 +161,5 @@ public class MyChunks
             if(chunkMap.remove(position) != null)
                 logger.info("Chunk unloaded: "+chunk.getWorld().getName()+position);
         } );
-    }
-
-    private static Vector3i blockToChunk(Vector3i position)
-    {
-        return new Vector3i(position.getX()>>4, 0, position.getZ()>>4);
     }
 }
