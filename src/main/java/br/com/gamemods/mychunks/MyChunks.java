@@ -3,6 +3,7 @@ package br.com.gamemods.mychunks;
 import static br.com.gamemods.mychunks.Util.*;
 
 import br.com.gamemods.mychunks.data.api.DataStorage;
+import br.com.gamemods.mychunks.data.api.DataStorageException;
 import br.com.gamemods.mychunks.data.state.ClaimedChunk;
 import br.com.gamemods.mychunks.data.state.Permission;
 import br.com.gamemods.mychunks.data.state.PlayerName;
@@ -146,10 +147,17 @@ public class MyChunks
         UUID worldId = chunk.getWorld().getUniqueId();
         Vector3i position = chunk.getPosition();
 
-        dataStorage.loadChunk(worldId, position).ifPresent(claimedChunk ->{
-            logger.info("Chunk loaded: "+chunk.getWorld().getName()+position);
-            getChunkMap(worldId).orElseThrow(IllegalStateException::new).put(position, claimedChunk);
-        });
+        try
+        {
+            dataStorage.loadChunk(worldId, position).ifPresent(claimedChunk ->{
+                logger.info("Chunk loaded: "+chunk.getWorld().getName()+position);
+                getChunkMap(worldId).orElseThrow(IllegalStateException::new).put(position, claimedChunk);
+            });
+        } catch (DataStorageException e)
+        {
+            logger.error("Failed to load chunk information on "+chunk.getWorld().getName()+position, e);
+            getChunkMap(worldId).orElseThrow(IllegalStateException::new).put(position, new ClaimedChunk(worldId, position));
+        }
     }
 
     @Listener
