@@ -2,6 +2,7 @@ package br.com.gamemods.mychunks.data.state;
 
 import com.flowpowered.math.vector.Vector3i;
 import org.spongepowered.api.entity.living.player.Player;
+import org.spongepowered.api.util.Tristate;
 import org.spongepowered.api.util.annotation.NonnullByDefault;
 
 import javax.annotation.Nullable;
@@ -18,7 +19,7 @@ public class ClaimedChunk
     private final UUID worldId;
     private final Vector3i position;
     private PlayerName owner = PlayerName.ADMINS;
-    private Map<UUID, Member> members = new HashMap<>(0);
+    private Map<UUID, Set<Member>> members = new HashMap<>(0);
     private EnumMap<Permission, Boolean> publicPermissions;
     @Nullable
     private Zone zone;
@@ -69,28 +70,39 @@ public class ClaimedChunk
      */
     public boolean check(Permission permission, Player player, boolean notify)
     {
-        UUID playerUniqueId = player.getUniqueId();
-        if(owner.getUniqueId().equals(playerUniqueId))
-            return true;
-
-        if(owner.equalsPlayer(PlayerName.ADMINS) && player.hasPermission("mychunks.server-admin"))
-            return true;
-
-        Member member = members.get(playerUniqueId);
-        if(member != null && member.getRank().getPermission(permission).orElse(false))
-            return true;
-
-        if(getPublicPermission(permission).orElse(false))
-            return true;
-
-        Zone zone = this.zone;
-        if(zone != null && zone.check(permission, playerUniqueId))
+        if(check(permission, player.getUniqueId(), player.hasPermission("mychunks.server-admin")))
             return true;
 
         if(notify)
             permission.notifyFailure(player, owner);
 
         return false;
+    }
+
+    public boolean check(Permission permission, UUID playerUniqueId)
+    {
+        return check(permission, playerUniqueId, PlayerName.ADMINS.equalsPlayer(playerUniqueId));
+    }
+
+    public boolean check(Permission permission, UUID playerUniqueId, boolean isAdmin)
+    {
+        if(owner.getUniqueId().equals(playerUniqueId))
+            return true;
+
+        if(owner.equalsPlayer(PlayerName.ADMINS) && isAdmin)
+            return true;
+
+        Set<Member> memberSet= members.get(playerUniqueId);
+        if(memberSet != null)
+            for(Member member: memberSet)
+                if(member != null && member.getRank().getPermission(permission).orElse(false))
+                    return true;
+
+        if(getPublicPermission(permission).orElse(false))
+            return true;
+
+        Zone zone = this.zone;
+        return zone != null && zone.check(permission, playerUniqueId);
     }
 
     /**
@@ -147,5 +159,36 @@ public class ClaimedChunk
             throw new IllegalArgumentException("The zone "+zone.getName()+" does not contains this chunk "+position);
 
         this.zone = zone;
+    }
+
+    public void addMember(Member member)
+    {
+        UUID playerId = member.getPlayerId().getUniqueId();
+        Set<Member> memberSet = members.get(playerId);
+        if(memberSet == null) members.put(playerId, memberSet = new HashSet<>(1));
+        memberSet.add(member);
+    }
+
+    public boolean removeMember(Member member)
+    {
+        UUID playerId = member.getPlayerId().getUniqueId();
+        Set<Member> memberSet = members.get(playerId);
+        if(memberSet == null)
+            return false;
+        boolean modified = memberSet.remove(member);
+        if(memberSet.isEmpty())
+            modified |= members.remove(playerId) != null;
+
+        return modified;
+    }
+
+    public boolean setPublicPermission(Permission permission, Tristate value)
+    {
+        if(value == Tristate.UNDEFINED)
+            return publicPermissions.remove(permission) != null;
+
+        boolean bool = value.asBoolean();
+        Boolean replacement = publicPermissions.put(permission, bool);
+        return replacement == null || bool != replacement;
     }
 }
