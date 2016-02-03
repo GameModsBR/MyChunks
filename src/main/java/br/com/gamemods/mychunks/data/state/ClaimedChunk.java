@@ -88,6 +88,7 @@ public class ClaimedChunk extends PermissionContext
         if(zone != null && zone.getChunkAt(position).orElse(null) != this)
             throw new IllegalArgumentException("The zone "+zone.getName()+" does not contains this chunk "+position);
 
+        modified |= !Objects.equals(this.zone, zone);
         this.zone = zone;
     }
 }

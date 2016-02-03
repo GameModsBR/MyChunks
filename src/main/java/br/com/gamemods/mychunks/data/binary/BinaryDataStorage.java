@@ -63,6 +63,12 @@ public class BinaryDataStorage implements DataStorage
         }
     }
 
+    @Override
+    public void saveChunk(ClaimedChunk chunk)
+    {
+
+    }
+
     /**
      * A cache of all data read about a world
      */

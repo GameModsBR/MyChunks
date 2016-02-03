@@ -10,11 +10,12 @@ import java.util.*;
 
 @ParametersAreNonnullByDefault
 @NonnullByDefault
-public class PermissionContext
+public class PermissionContext implements Modifiable
 {
     private Optional<PlayerName> owner = Optional.empty();
     private Map<UUID, Set<Member>> members = new HashMap<>(0);
     private EnumMap<Permission, Boolean> publicPermissions;
+    protected boolean modified;
 
     public PermissionContext()
     {
@@ -113,7 +114,10 @@ public class PermissionContext
      */
     public void setOwner(@Nullable PlayerName owner) throws UnsupportedOperationException
     {
-        this.owner = Optional.ofNullable(owner);
+        Optional<PlayerName> newValue = Optional.ofNullable(owner);
+
+        modified |= !this.owner.equals(newValue);
+        this.owner = newValue;
     }
 
     public void addMember(Member member)
@@ -121,7 +125,7 @@ public class PermissionContext
         UUID playerId = member.getPlayerId().getUniqueId();
         Set<Member> memberSet = members.get(playerId);
         if(memberSet == null) members.put(playerId, memberSet = new HashSet<>(1));
-        memberSet.add(member);
+        modified |= memberSet.add(member);
     }
 
     public boolean removeMember(Member member)
@@ -134,6 +138,7 @@ public class PermissionContext
         if(memberSet.isEmpty())
             modified |= members.remove(playerId) != null;
 
+        this.modified |= modified;
         return modified;
     }
 
@@ -144,6 +149,21 @@ public class PermissionContext
 
         boolean bool = value.asBoolean();
         Boolean replacement = publicPermissions.put(permission, bool);
-        return replacement == null || bool != replacement;
+        bool = replacement == null || bool != replacement;
+
+        modified |= bool;
+        return bool;
+    }
+
+    @Override
+    public boolean isModified()
+    {
+        return modified;
+    }
+
+    @Override
+    public void setModified(boolean modified)
+    {
+        this.modified = modified;
     }
 }

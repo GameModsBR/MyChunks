@@ -20,7 +20,7 @@ import java.util.Set;
  */
 @ParametersAreNonnullByDefault
 @NonnullByDefault
-public enum Permission
+public enum Permission implements Modifiable
 {
     /**
      * Place, break or replace blocks
@@ -54,6 +54,7 @@ public enum Permission
 
     private boolean defaultValue = false;
     private Text failureMessage;
+    private boolean modified;
 
     /**
      * Construct a permission specifying a failure message, the message will be formatted following the failure message standard.
@@ -91,6 +92,7 @@ public enum Permission
      */
     public void setAllowedByDefault(boolean allowed)
     {
+        modified |= defaultValue != allowed;
         this.defaultValue = allowed;
         if(allowed)
             defaultPermissions.add(this);
@@ -132,5 +134,17 @@ public enum Permission
     private static Text.Builder header()
     {
         return Text.builder("Permission> ");
+    }
+
+    @Override
+    public boolean isModified()
+    {
+        return modified;
+    }
+
+    @Override
+    public void setModified(boolean modified)
+    {
+        this.modified = modified;
     }
 }

@@ -2,11 +2,10 @@ package br.com.gamemods.mychunks.data.state;
 
 import br.com.gamemods.mychunks.Util;
 import com.flowpowered.math.vector.Vector3i;
+import org.spongepowered.api.util.Direction;
 import org.spongepowered.api.util.Identifiable;
-import org.spongepowered.api.util.Tristate;
 import org.spongepowered.api.util.annotation.NonnullByDefault;
 
-import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
 import javax.naming.InvalidNameException;
 import java.util.*;
@@ -22,7 +21,7 @@ public class Zone extends PermissionContext implements Identifiable
 {
     private final UUID zoneId;
     private final UUID worldId;
-    private String name;
+    private String name = "unnamed";
     private Map<Vector3i, ClaimedChunk> chunkMap = new HashMap<>(1);
 
     /**
@@ -51,15 +50,52 @@ public class Zone extends PermissionContext implements Identifiable
         return Optional.ofNullable(chunkMap.get(position));
     }
 
-    public void removeChunkAt(Vector3i position)
+    public boolean isChunkRequired(final Vector3i position)
     {
+        if(chunkMap.size() <= 1 || !chunkMap.containsKey(position))
+            return false;
+
+        lookup:
+        for(Vector3i direction: Util.CARDINAL_DIRECTIONS)
+        {
+            Vector3i supported = position.add(direction);
+            if(!chunkMap.containsKey(supported))
+                continue;
+
+            for(Vector3i secondDirection: Util.CARDINAL_DIRECTIONS)
+            {
+                Vector3i alternativeSupport = supported.add(secondDirection);
+                if(alternativeSupport.equals(position))
+                    continue;
+
+                if(chunkMap.containsKey(alternativeSupport))
+                    continue lookup;;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    public void removeChunkAt(Vector3i position) throws IllegalArgumentException
+    {
+        if(isChunkRequired(position))
+            throw new IllegalArgumentException("The chunk "+position+" is required by an other chunk");
+
         ClaimedChunk removed = chunkMap.remove(position);
         if(removed != null)
+        {
             removed.setZone(null);
+            modified = true;
+        }
     }
 
     public void addChunk(ClaimedChunk chunk) throws IllegalArgumentException
     {
+        if(!chunk.getWorldId().equals(worldId))
+            throw new IllegalArgumentException("The chunk "+chunk.getWorldId()+chunk.getPosition()+" is not part of the world "+worldId);
+
         Zone zone = chunk.getZone();
         if(zone == this)
             return;
@@ -68,6 +104,7 @@ public class Zone extends PermissionContext implements Identifiable
         if(zone != null)
             zone.removeChunkAt(addedPosition);
 
+        check:
         if(!chunkMap.isEmpty())
         {
             chunkIteration:
@@ -84,8 +121,8 @@ public class Zone extends PermissionContext implements Identifiable
                         else one = true;
                     }
 
-                chunkMap.put(addedPosition, chunk);
-                return;
+                if(one)
+                    break check;
             }
 
             throw new IllegalArgumentException("The chunk "+addedPosition+" is not touching any of these chunks: "+chunkMap.keySet());
@@ -93,6 +130,7 @@ public class Zone extends PermissionContext implements Identifiable
 
         chunkMap.put(addedPosition, chunk);
         chunk.setZone(this);
+        modified = true;
     }
 
     public UUID getWorldId()
@@ -125,6 +163,7 @@ public class Zone extends PermissionContext implements Identifiable
         String normalized = Util.normalizeIdentifier(name);
         if(normalized.isEmpty()) name = "Unnamed Zone "+System.currentTimeMillis();
 
+        modified |= !this.name.equals(name);
         this.name = name;
         return name;
     }
@@ -134,6 +173,8 @@ public class Zone extends PermissionContext implements Identifiable
         if(!name.trim().equals(name)) throw new InvalidNameException("Name has trailing or leading whitespace");
         String normalized = Util.normalizeIdentifier(name);
         if(normalized.isEmpty()) throw new InvalidNameException("Normalized name is empty");
+
+        modified |= !this.name.equals(name);
         this.name = name;
     }
 

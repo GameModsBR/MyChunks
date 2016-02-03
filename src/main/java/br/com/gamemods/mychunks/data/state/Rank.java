@@ -15,11 +15,12 @@ import java.util.UUID;
  */
 @ParametersAreNonnullByDefault
 @NonnullByDefault
-public class Rank implements Identifiable
+public class Rank implements Identifiable, Modifiable
 {
     private final UUID rankId;
     private String name = "unnamed";
     private EnumSet<Permission> permissions;
+    private boolean modified;
 
     public Rank(String name, EnumSet<Permission> permissions)
     {
@@ -64,6 +65,8 @@ public class Rank implements Identifiable
         name = name.trim();
         if(name.isEmpty())
             throw new IllegalArgumentException("Name is empty");
+
+        modified |= !this.name.equals(name);
         this.name = name;
     }
 
@@ -80,5 +83,17 @@ public class Rank implements Identifiable
     public UUID getUniqueId()
     {
         return rankId;
+    }
+
+    @Override
+    public boolean isModified()
+    {
+        return modified;
+    }
+
+    @Override
+    public void setModified(boolean modified)
+    {
+        this.modified = modified;
     }
 }

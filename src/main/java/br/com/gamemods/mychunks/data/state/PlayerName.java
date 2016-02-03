@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
  */
 @ParametersAreNonnullByDefault
 @NonnullByDefault
-public class PlayerName
+public class PlayerName implements Modifiable
 {
     /**
      * A fake player that refer to all server admins
@@ -22,6 +22,7 @@ public class PlayerName
 
     private final UUID uniqueId;
     private String name;
+    private boolean modified;
 
     /**
      * Construct a player reference using an unvalidated name.
@@ -64,6 +65,7 @@ public class PlayerName
      */
     public void setName(String name) throws IllegalArgumentException
     {
+        modified |= !name.equals(this.name);
         this.name = name;
     }
 
@@ -85,5 +87,17 @@ public class PlayerName
     public boolean equalsPlayer(@Nullable UUID playerUniqueId)
     {
         return playerUniqueId != null && playerUniqueId.equals(uniqueId);
+    }
+
+    @Override
+    public boolean isModified()
+    {
+        return modified;
+    }
+
+    @Override
+    public void setModified(boolean modified)
+    {
+        this.modified = modified;
     }
 }

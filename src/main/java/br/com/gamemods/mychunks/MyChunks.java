@@ -12,6 +12,7 @@ import com.google.inject.Inject;
 import org.slf4j.Logger;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.block.BlockSnapshot;
+import org.spongepowered.api.block.BlockTypes;
 import org.spongepowered.api.command.CommandResult;
 import org.spongepowered.api.command.spec.CommandSpec;
 import org.spongepowered.api.data.Transaction;
@@ -21,6 +22,8 @@ import org.spongepowered.api.event.block.ChangeBlockEvent;
 import org.spongepowered.api.event.cause.NamedCause;
 import org.spongepowered.api.event.filter.cause.First;
 import org.spongepowered.api.event.filter.cause.Named;
+import org.spongepowered.api.event.game.state.GameInitializationEvent;
+import org.spongepowered.api.event.game.state.GamePreInitializationEvent;
 import org.spongepowered.api.event.game.state.GameStartingServerEvent;
 import org.spongepowered.api.event.world.LoadWorldEvent;
 import org.spongepowered.api.event.world.SaveWorldEvent;
@@ -40,10 +43,15 @@ import java.util.concurrent.ConcurrentHashMap;
 public class MyChunks
 {
     private Map<UUID, Map<Vector3i, ClaimedChunk>> claimedChunks = new ConcurrentHashMap<>(1);
-    private DataStorage dataStorage = (x,y) -> Optional.empty();
+    private DataStorage dataStorage;
 
     @Inject
     private Logger logger;
+
+    @Listener
+    public void onGamePreInit(GamePreInitializationEvent event)
+    {
+    }
 
     @Listener
     public void onServerStarting(GameStartingServerEvent event)

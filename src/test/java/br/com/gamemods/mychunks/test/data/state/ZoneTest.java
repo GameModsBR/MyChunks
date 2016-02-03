@@ -23,7 +23,7 @@ public class ZoneTest extends PermissionContextTest
     public void setUpContext() throws Exception
     {
         context = zone1 = new Zone(UUID.randomUUID(), "Test Zone A");
-        zone2 = new Zone(UUID.randomUUID(), "Test Zone B");
+        zone2 = new Zone(zone1.getWorldId(), "Test Zone B");
     }
 
     @Test
@@ -76,7 +76,13 @@ public class ZoneTest extends PermissionContextTest
     public void testAddRemoveChunk() throws Exception
     {
         Vector3i position = new Vector3i(5,0,9);
-        ClaimedChunk claimedChunk = new ClaimedChunk(zone1.getWorldId(), position);
+        UUID worldId = zone1.getWorldId();
+        ClaimedChunk claimedChunk = new ClaimedChunk(worldId, position);
+        ClaimedChunk diagonalChunk = new ClaimedChunk(worldId, new Vector3i(6,0,10));
+        ClaimedChunk crossChunk = new ClaimedChunk(worldId, new Vector3i(4,0,9));
+        ClaimedChunk crossChunk2 = new ClaimedChunk(worldId, new Vector3i(3,0,9));
+        ClaimedChunk farChunk = new ClaimedChunk(worldId, new Vector3i(-10,0,4));
+        ClaimedChunk dimensionalChunk = new ClaimedChunk(UUID.randomUUID(), crossChunk.getPosition());
 
         // Add
         zone1.addChunk(claimedChunk);
@@ -99,5 +105,47 @@ public class ZoneTest extends PermissionContextTest
         assertNull(claimedChunk.getZone());
         opt = zone2.getChunkAt(position);
         assertFalse(opt.isPresent());
+
+        // Add diagonally
+        zone1.addChunk(claimedChunk);
+        try
+        {
+            zone1.addChunk(diagonalChunk);
+            throw new AssertionError("Accepted a diagonal chunk");
+        }
+        catch (IllegalArgumentException ignored)
+        {}
+
+        // Add cross chunk
+        zone1.addChunk(crossChunk);
+        assertEquals(crossChunk, zone1.getChunkAt(crossChunk.getPosition()).get());
+
+        // Add far chunk
+        try
+        {
+            zone1.addChunk(farChunk);
+            throw new AssertionError("Accepted a far chunk");
+        }
+        catch (IllegalArgumentException ignored)
+        {}
+
+        // Add a dimensional chunk
+        try
+        {
+            zone1.addChunk(dimensionalChunk);
+            throw new AssertionError("Accepted a dimensional chunk");
+        }
+        catch (IllegalArgumentException ignored)
+        {}
+
+        // Remove a chunk middle chunk
+        zone1.addChunk(crossChunk2);
+        try
+        {
+            zone1.removeChunkAt(crossChunk.getPosition());
+            throw new AssertionError("Allowed to remove the middle chunk of a 3 chunk zone");
+        }
+        catch (IllegalArgumentException ignored)
+        {}
     }
 }
