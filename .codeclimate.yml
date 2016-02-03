@@ -1,0 +1,13 @@
+engines:
+  rubocop:
+    enabled: true
+  golint:
+    enabled: true
+  eslint:
+    enabled: true
+  csslint:
+    enabled: true
+ratings:
+  paths:
+  - src/main/java
+  - src/test/java
