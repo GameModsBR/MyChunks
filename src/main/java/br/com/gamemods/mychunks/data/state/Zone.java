@@ -18,16 +18,12 @@ import java.util.*;
  */
 @ParametersAreNonnullByDefault
 @NonnullByDefault
-public class Zone implements Identifiable
+public class Zone extends PermissionContext implements Identifiable
 {
     private final UUID zoneId;
     private final UUID worldId;
     private String name;
-    @Nullable
-    private PlayerName owner;
     private Map<Vector3i, ClaimedChunk> chunkMap = new HashMap<>(1);
-    private EnumMap<Permission, Boolean> publicPermissionsMap = new EnumMap<>(Permission.class);
-    private Map<UUID, Set<Member>> members = new HashMap<>(0);
 
     /**
      * Construct a zone instance with a specified UUID, this constructor is normally used to load a persisted zone.
@@ -99,58 +95,9 @@ public class Zone implements Identifiable
         chunk.setZone(this);
     }
 
-    public boolean check(Permission permission, UUID playerUniqueId)
-    {
-        PlayerName owner = this.owner;
-        if(owner != null && owner.getUniqueId().equals(playerUniqueId))
-            return true;
-
-        Set<Member> memberSet = members.get(playerUniqueId);
-        if(memberSet != null)
-            for(Member member: memberSet)
-                if(member != null && member.getRank().getPermission(permission).orElse(false))
-                    return true;
-
-        return getPublicPermission(permission).orElse(permission.isAllowedByDefault());
-    }
-
-    public void addMember(Member member)
-    {
-        UUID playerId = member.getPlayerId().getUniqueId();
-        Set<Member> memberSet = members.get(playerId);
-        if(memberSet == null) members.put(playerId, memberSet = new HashSet<>(1));
-        memberSet.add(member);
-    }
-
-    public boolean setPublicPermission(Permission permission, Tristate value)
-    {
-        if(value == Tristate.UNDEFINED)
-            return publicPermissionsMap.remove(permission) != null;
-
-        boolean bool = value.asBoolean();
-        Boolean replacement = publicPermissionsMap.put(permission, bool);
-        return replacement == null || bool != replacement;
-    }
-
-    public Optional<Boolean> getPublicPermission(Permission permission)
-    {
-        return Optional.ofNullable(publicPermissionsMap.get(permission));
-    }
-
     public UUID getWorldId()
     {
         return worldId;
-    }
-
-    @Nullable
-    public PlayerName getOwner()
-    {
-        return owner;
-    }
-
-    public void setOwner(@Nullable PlayerName owner)
-    {
-        this.owner = owner;
     }
 
     public String getName()
@@ -193,18 +140,5 @@ public class Zone implements Identifiable
     public UUID getUniqueId()
     {
         return zoneId;
-    }
-
-    public boolean removeMember(Member member)
-    {
-        UUID playerId = member.getPlayerId().getUniqueId();
-        Set<Member> memberSet = members.get(playerId);
-        if(memberSet == null)
-            return false;
-        boolean modified = memberSet.remove(member);
-        if(memberSet.isEmpty())
-            modified |= members.remove(playerId) != null;
-
-        return modified;
     }
 }

@@ -15,14 +15,14 @@ import java.util.UUID;
 
 import static org.junit.Assert.*;
 
-public class ZoneTest
+public class ZoneTest extends PermissionContextTest
 {
     private Zone zone1, zone2;
 
     @Before
-    public void setUp() throws Exception
+    public void setUpContext() throws Exception
     {
-        zone1 = new Zone(UUID.randomUUID(), "Test Zone A");
+        context = zone1 = new Zone(UUID.randomUUID(), "Test Zone A");
         zone2 = new Zone(UUID.randomUUID(), "Test Zone B");
     }
 
@@ -70,49 +70,6 @@ public class ZoneTest
                 return item.toString().matches("Unnamed Zone [0-9]+");
             }
         });
-    }
-
-    @Test
-    public void testMembersAndPermissions() throws Exception
-    {
-        PlayerName owner = new PlayerName(UUID.randomUUID(), "Player Owner");
-        assertFalse(zone1.check(Permission.MODIFY, owner.getUniqueId()));
-
-        zone1.setOwner(owner);
-        assertEquals(zone1.getOwner(), owner);
-        assertTrue(zone1.check(Permission.MODIFY, owner.getUniqueId()));
-
-        Rank builderRank = new Rank("builder", EnumSet.of(Permission.MODIFY));
-        PlayerName builder = new PlayerName(UUID.randomUUID(), "Player Builder");
-        assertFalse(zone1.check(Permission.MODIFY, builder.getUniqueId()));
-
-        Member member = new Member(builder, builderRank);
-        zone1.addMember(member);
-        assertTrue(zone1.check(Permission.MODIFY, builder.getUniqueId()));
-        assertTrue(zone1.removeMember(member));
-        assertFalse(zone1.check(Permission.MODIFY, builder.getUniqueId()));
-
-        zone1.setOwner(null);
-        assertFalse(zone1.check(Permission.MODIFY, owner.getUniqueId()));
-
-        assertTrue(zone1.setPublicPermission(Permission.MODIFY, Tristate.TRUE));
-        assertTrue(zone1.check(Permission.MODIFY, owner.getUniqueId()));
-        assertTrue(zone1.check(Permission.MODIFY, builder.getUniqueId()));
-
-        assertTrue(zone1.setPublicPermission(Permission.ENTER, Tristate.FALSE));
-        assertFalse(zone1.setPublicPermission(Permission.ENTER, Tristate.FALSE));
-        assertFalse(zone1.check(Permission.ENTER, owner.getUniqueId()));
-        assertFalse(zone1.check(Permission.ENTER, builder.getUniqueId()));
-
-        assertTrue(zone1.setPublicPermission(Permission.ENTER, Tristate.UNDEFINED));
-        assertFalse(zone1.setPublicPermission(Permission.ENTER, Tristate.UNDEFINED));
-        assertTrue(zone1.check(Permission.MODIFY, owner.getUniqueId()));
-        assertTrue(zone1.check(Permission.MODIFY, builder.getUniqueId()));
-
-        assertTrue(zone1.setPublicPermission(Permission.MODIFY, Tristate.UNDEFINED));
-        assertFalse(zone1.setPublicPermission(Permission.MODIFY, Tristate.UNDEFINED));
-        assertFalse(zone1.check(Permission.MODIFY, owner.getUniqueId()));
-        assertFalse(zone1.check(Permission.MODIFY, builder.getUniqueId()));
     }
 
     @Test

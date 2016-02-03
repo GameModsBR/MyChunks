@@ -11,55 +11,38 @@ import java.util.UUID;
 
 import static org.junit.Assert.*;
 
-public class ClaimedChunkTest
+public class ClaimedChunkTest extends PermissionContextTest
 {
     ClaimedChunk chunk;
     @Before
-    public void setUp() throws Exception
+    public void setUpContext() throws Exception
     {
-        chunk = new ClaimedChunk(UUID.randomUUID(), new Vector3i(380, 0 , -568));
+        context = chunk = new ClaimedChunk(UUID.randomUUID(), new Vector3i(380, 0 , -568));
     }
 
     @Test
-    public void testMembersAndPermissions() throws Exception
+    public void testZonePermission() throws Exception
     {
-        PlayerName owner = new PlayerName(UUID.randomUUID(), "Player Owner");
-        assertFalse(chunk.check(Permission.MODIFY, owner.getUniqueId()));
+        Zone zone = new Zone(UUID.randomUUID(), "Test Zone");
+        zone.addChunk(chunk);
 
-        chunk.setOwner(owner);
-        assertEquals(chunk.getOwner(), owner);
-        assertTrue(chunk.check(Permission.MODIFY, owner.getUniqueId()));
+        assertFalse(chunk.check(Permission.MODIFY, owner));
+        zone.setOwner(owner);
+        assertTrue(chunk.check(Permission.MODIFY, owner));
+        zone.setOwner(null);
+        assertFalse(chunk.check(Permission.MODIFY, owner));
 
-        Rank builderRank = new Rank("builder", EnumSet.of(Permission.MODIFY));
-        PlayerName builder = new PlayerName(UUID.randomUUID(), "Player Builder");
-        assertFalse(chunk.check(Permission.MODIFY, builder.getUniqueId()));
+        assertFalse(chunk.check(Permission.MODIFY, builder));
+        zone.addMember(new Member(builder, builderRank));
+        assertTrue(chunk.check(Permission.MODIFY, builder));
+        zone.removeChunkAt(chunk.getPosition());
+        assertFalse(chunk.check(Permission.MODIFY, builder));
 
-        Member member = new Member(builder, builderRank);
-        chunk.addMember(member);
-        assertTrue(chunk.check(Permission.MODIFY, builder.getUniqueId()));
-        assertTrue(chunk.removeMember(member));
-        assertFalse(chunk.check(Permission.MODIFY, builder.getUniqueId()));
-
-        chunk.setOwner(PlayerName.ADMINS);
-        assertFalse(chunk.check(Permission.MODIFY, owner.getUniqueId()));
-
-        assertTrue(chunk.setPublicPermission(Permission.MODIFY, Tristate.TRUE));
-        assertTrue(chunk.check(Permission.MODIFY, owner.getUniqueId()));
-        assertTrue(chunk.check(Permission.MODIFY, builder.getUniqueId()));
-
-        assertTrue(chunk.setPublicPermission(Permission.ENTER, Tristate.FALSE));
-        assertFalse(chunk.setPublicPermission(Permission.ENTER, Tristate.FALSE));
-        assertFalse(chunk.check(Permission.ENTER, owner.getUniqueId()));
-        assertFalse(chunk.check(Permission.ENTER, builder.getUniqueId()));
-
-        assertTrue(chunk.setPublicPermission(Permission.ENTER, Tristate.UNDEFINED));
-        assertFalse(chunk.setPublicPermission(Permission.ENTER, Tristate.UNDEFINED));
-        assertTrue(chunk.check(Permission.MODIFY, owner.getUniqueId()));
-        assertTrue(chunk.check(Permission.MODIFY, builder.getUniqueId()));
-
-        assertTrue(chunk.setPublicPermission(Permission.MODIFY, Tristate.UNDEFINED));
-        assertFalse(chunk.setPublicPermission(Permission.MODIFY, Tristate.UNDEFINED));
-        assertFalse(chunk.check(Permission.MODIFY, owner.getUniqueId()));
-        assertFalse(chunk.check(Permission.MODIFY, builder.getUniqueId()));
+        zone.addChunk(chunk);
+        assertTrue(chunk.check(Permission.MODIFY, builder));
+        zone.removeMember(new Member(builder, builderRank));
+        assertFalse(chunk.check(Permission.MODIFY, builder));
+        zone.removeChunkAt(chunk.getPosition());
+        assertFalse(chunk.check(Permission.MODIFY, builder));
     }
 }

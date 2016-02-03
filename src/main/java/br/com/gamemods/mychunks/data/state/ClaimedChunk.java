@@ -14,13 +14,11 @@ import java.util.*;
  */
 @ParametersAreNonnullByDefault
 @NonnullByDefault
-public class ClaimedChunk
+public class ClaimedChunk extends PermissionContext
 {
     private final UUID worldId;
     private final Vector3i position;
-    private PlayerName owner = PlayerName.ADMINS;
-    private Map<UUID, Set<Member>> members = new HashMap<>(0);
-    private EnumMap<Permission, Boolean> publicPermissions;
+
     @Nullable
     private Zone zone;
 
@@ -33,72 +31,21 @@ public class ClaimedChunk
     {
         this.worldId = worldId;
         this.position = position;
-        publicPermissions = new EnumMap<>(Permission.class);
     }
 
     /**
-     * <p>Checks if this chunks declares an specific permission as public.</p>
-     * Public permissions allows anyone to do this action regardless if the subject is a member or not.
-     * @param permission The permission to be checked
-     * @return {@code true} if it's permitted, {@code false} if it's denied or empty if it's not defined.
-     */
-    public Optional<Boolean> getPublicPermission(Permission permission)
-    {
-        return Optional.ofNullable(publicPermissions.get(permission));
-    }
-
-    /**
-     * <p>Checks if a player has an specific permission on this chunk.</p>
+     * <p>Checks if a player has an specific permission on this context.</p>
      * <p>It checks the player public permissions, the player rank and the zone that this chunk resides.</p>
      * <p>The player will be notified if the permission is denied</p>
      * @param permission The permission to be checked
-     * @param player The player that needs this permission
+     * @param playerUniqueId The player that needs this permission
+     * @param isAdmin If the player has admin permission
      * @return If the player has permission
      */
-    public boolean check(Permission permission, Player player)
-    {
-        return check(permission, player, true);
-    }
-
-    /**
-     * <p>Checks if a player has an specific permission on this chunk.</p>
-     * <p>It checks the player public permissions, the player rank and the zone that this chunk resides.</p>
-     * @param permission The permission to be checked
-     * @param player The player that needs this permission
-     * @param notify If the player should be notified if the permission is denied
-     * @return If the player has permission
-     */
-    public boolean check(Permission permission, Player player, boolean notify)
-    {
-        if(check(permission, player.getUniqueId(), player.hasPermission("mychunks.server-admin")))
-            return true;
-
-        if(notify)
-            permission.notifyFailure(player, owner);
-
-        return false;
-    }
-
-    public boolean check(Permission permission, UUID playerUniqueId)
-    {
-        return check(permission, playerUniqueId, PlayerName.ADMINS.equalsPlayer(playerUniqueId));
-    }
-
+    @Override
     public boolean check(Permission permission, UUID playerUniqueId, boolean isAdmin)
     {
-        if(owner.getUniqueId().equals(playerUniqueId))
-            return true;
-
-        if(owner.equalsPlayer(PlayerName.ADMINS) && isAdmin)
-            return true;
-
-        Set<Member> memberSet= members.get(playerUniqueId);
-        if(memberSet != null)
-            for(Member member: memberSet)
-                if(member != null && member.getRank().getPermission(permission).orElse(false))
-                    return true;
-
-        if(getPublicPermission(permission).orElse(false))
+        if(super.check(permission, playerUniqueId, isAdmin))
             return true;
 
         Zone zone = this.zone;
@@ -122,23 +69,6 @@ public class ClaimedChunk
     }
 
     /**
-     * The owner of this chunk, note that it can also be a fake player like {@link PlayerName#ADMINS}.
-     */
-    public PlayerName getOwner()
-    {
-        return owner;
-    }
-
-    /**
-     * Changes the owner of this chunk, the change is not persisted immediately
-     * @param owner The new owner, can be a fake player but can't be null
-     */
-    public void setOwner(PlayerName owner)
-    {
-        this.owner = owner;
-    }
-
-    /**
      * The zone that this chunk resides, can be {@code null} if this chunk is not part of a zone.
      */
     @Nullable
@@ -159,36 +89,5 @@ public class ClaimedChunk
             throw new IllegalArgumentException("The zone "+zone.getName()+" does not contains this chunk "+position);
 
         this.zone = zone;
-    }
-
-    public void addMember(Member member)
-    {
-        UUID playerId = member.getPlayerId().getUniqueId();
-        Set<Member> memberSet = members.get(playerId);
-        if(memberSet == null) members.put(playerId, memberSet = new HashSet<>(1));
-        memberSet.add(member);
-    }
-
-    public boolean removeMember(Member member)
-    {
-        UUID playerId = member.getPlayerId().getUniqueId();
-        Set<Member> memberSet = members.get(playerId);
-        if(memberSet == null)
-            return false;
-        boolean modified = memberSet.remove(member);
-        if(memberSet.isEmpty())
-            modified |= members.remove(playerId) != null;
-
-        return modified;
-    }
-
-    public boolean setPublicPermission(Permission permission, Tristate value)
-    {
-        if(value == Tristate.UNDEFINED)
-            return publicPermissions.remove(permission) != null;
-
-        boolean bool = value.asBoolean();
-        Boolean replacement = publicPermissions.put(permission, bool);
-        return replacement == null || bool != replacement;
     }
 }
