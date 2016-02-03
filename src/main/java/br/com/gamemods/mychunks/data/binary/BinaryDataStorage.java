@@ -22,11 +22,18 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Data storage implementation that stores the data as binary files, on the disk.
+ * <p>The data is saved in multiple files organized by directories</p>
+ */
 @NonnullByDefault
 @ParametersAreNonnullByDefault
 public class BinaryDataStorage implements DataStorage
 {
     private final File storageDir;
+
+    // We cache the data to prevent issues with slow IO operations when the same chunk is loaded and unloaded too many times
+    // and when multiple chunks are loaded from the same region too quickly
     private LoadingCache<UUID, WorldData> worldCache = CacheBuilder.newBuilder()
             .expireAfterAccess(15, TimeUnit.MINUTES)
             .build(new CacheLoader<UUID, WorldData>()
@@ -56,6 +63,9 @@ public class BinaryDataStorage implements DataStorage
         }
     }
 
+    /**
+     * A cache of all data read about a world
+     */
     private class WorldData
     {
         private final UUID worldId;
@@ -80,6 +90,9 @@ public class BinaryDataStorage implements DataStorage
             return Optional.ofNullable(regionCache.get(chunkToRegion(position)).claimedChunkMap.get(position));
         }
 
+        /**
+         * A cache of all chunks in a region file
+         */
         private class RegionData
         {
             private final Vector2i position;
