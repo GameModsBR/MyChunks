@@ -5,7 +5,6 @@ import org.spongepowered.api.util.annotation.NonnullByDefault;
 import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 /**
  * A simple reference to a player. The name can be changed. It's recommended to reuse this instance to reflect
@@ -19,6 +18,7 @@ public class PlayerName implements Modifiable
      * A fake player that refer to all server admins
      */
     public static final PlayerName ADMINS = new PlayerName(UUID.nameUUIDFromBytes("MyChunks:Server-Admins".getBytes()), "Server Admins");
+    public static final PlayerName WILDERNESS = new PlayerName(UUID.nameUUIDFromBytes("MyChunks:Nature".getBytes()), "Nature");
 
     private final UUID uniqueId;
     private String name;
@@ -99,5 +99,20 @@ public class PlayerName implements Modifiable
     public void setModified(boolean modified)
     {
         this.modified = modified;
+    }
+
+    public boolean isGroupAdmins()
+    {
+        return ADMINS.uniqueId.equals(uniqueId);
+    }
+
+    public boolean isGroupNature()
+    {
+        return WILDERNESS.uniqueId.equals(uniqueId);
+    }
+
+    public boolean isGroup()
+    {
+        return isGroupAdmins() || isGroupNature();
     }
 }
