@@ -1,13 +1,10 @@
 package br.com.gamemods.mychunks.data.binary;
 
-import static br.com.gamemods.mychunks.Util.*;
-
 import br.com.gamemods.mychunks.data.api.DataStorage;
 import br.com.gamemods.mychunks.data.api.DataStorageException;
 import br.com.gamemods.mychunks.data.state.ClaimedChunk;
 import com.flowpowered.math.vector.Vector2i;
 import com.flowpowered.math.vector.Vector3i;
-import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -15,12 +12,15 @@ import org.spongepowered.api.util.annotation.NonnullByDefault;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+
+import static br.com.gamemods.mychunks.Util.chunkToRegion;
 
 /**
  * Data storage implementation that stores the data as binary files, on the disk.
@@ -45,9 +45,11 @@ public class BinaryDataStorage implements DataStorage
                 }
             });
 
-    public BinaryDataStorage(File storageDir)
+    public BinaryDataStorage(File storageDir) throws IOException
     {
         this.storageDir = storageDir;
+        if(!storageDir.isDirectory() && !storageDir.mkdirs())
+            throw new IOException("Failed to create the directory "+storageDir);
     }
 
     @Override

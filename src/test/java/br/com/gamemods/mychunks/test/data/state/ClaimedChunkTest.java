@@ -1,15 +1,17 @@
 package br.com.gamemods.mychunks.test.data.state;
 
-import br.com.gamemods.mychunks.data.state.*;
+import br.com.gamemods.mychunks.data.state.ClaimedChunk;
+import br.com.gamemods.mychunks.data.state.Member;
+import br.com.gamemods.mychunks.data.state.Permission;
+import br.com.gamemods.mychunks.data.state.Zone;
 import com.flowpowered.math.vector.Vector3i;
 import org.junit.Before;
 import org.junit.Test;
-import org.spongepowered.api.util.Tristate;
 
-import java.util.EnumSet;
 import java.util.UUID;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class ClaimedChunkTest extends PermissionContextTest
 {
@@ -23,7 +25,7 @@ public class ClaimedChunkTest extends PermissionContextTest
     @Test
     public void testZonePermission() throws Exception
     {
-        Zone zone = new Zone(UUID.randomUUID(), "Test Zone");
+        Zone zone = new Zone(chunk.getWorldId(), "Test Zone");
         zone.addChunk(chunk);
 
         assertFalse(chunk.check(Permission.MODIFY, owner));

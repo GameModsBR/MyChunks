@@ -1,23 +1,27 @@
 package br.com.gamemods.mychunks.test;
 
 import br.com.gamemods.mychunks.data.state.Permission;
-import org.junit.Before;
 import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.HashSet;
 
-import static org.junit.Assert.*;
 import static br.com.gamemods.mychunks.Util.*;
+import static org.junit.Assert.assertEquals;
 
 public class UtilTest
 {
     @Test
     public void testEnumSetDefault() throws Exception
     {
-        assertEquals(EnumSet.noneOf(Permission.class), Permission.getDefaultPermissions());
+        EnumSet<Permission> permissions = EnumSet.allOf(Permission.class);
+        permissions.removeIf(p->!p.isAllowedByDefault());
+        assertEquals(permissions, Permission.getDefaultPermissions());
+
+        permissions = EnumSet.allOf(Permission.class);
+        permissions.removeIf(p->!p.isAllowedByDefaultOnTheWild());
+        assertEquals(permissions, Permission.getDefaultWildPermissions());
     }
 
     @Test
