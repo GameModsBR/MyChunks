@@ -28,12 +28,6 @@ public class OwnedContext extends PublicContext implements Modifiable
         permission.notifyFailure(player, owner.orElse(PlayerName.ADMINS));
     }
 
-    /**
-     * @param permission
-     * @param playerUniqueId
-     * @param isAdmin
-     * @return
-     */
     @Override
     public Optional<Boolean> getPermission(Permission permission, UUID playerUniqueId, boolean isAdmin)
     {
@@ -90,5 +84,10 @@ public class OwnedContext extends PublicContext implements Modifiable
 
         this.modified |= modified;
         return modified;
+    }
+
+    public Map<UUID, Set<Member>> getMembers()
+    {
+        return members;
     }
 }

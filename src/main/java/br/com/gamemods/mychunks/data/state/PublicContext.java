@@ -88,11 +88,6 @@ public class PublicContext implements Modifiable
         return getPublicPermission(permission).orElse(getDefaultPublicPermission(permission));
     }
 
-    /**
-     * The
-     * @param permission
-     * @return
-     */
     protected boolean getDefaultPublicPermission(Permission permission)
     {
         return false;

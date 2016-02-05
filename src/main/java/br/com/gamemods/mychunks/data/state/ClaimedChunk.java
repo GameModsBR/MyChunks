@@ -6,6 +6,7 @@ import org.spongepowered.api.util.annotation.NonnullByDefault;
 import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -32,24 +33,39 @@ public class ClaimedChunk extends OwnedContext
         this.position = position;
     }
 
-    /**
-     * <p>Checks if a player has an specific permission on this context.</p>
-     * <p>It checks the player public permissions, the player rank and the zone that this chunk resides.</p>
-     * <p>The player will be notified if the permission is denied</p>
-     * @param permission The permission to be checked
-     * @param playerUniqueId The player that needs this permission
-     * @param isAdmin If the player has admin permission
-     * @return If the player has permission
-     */
     @Override
-    public boolean check(Permission permission, UUID playerUniqueId, boolean isAdmin)
+    public Optional<Boolean> getPermission(Permission permission, UUID playerUniqueId, boolean isAdmin)
     {
-        if (super.check(permission, playerUniqueId, isAdmin))
-            return true;
+        Optional<Boolean> result = super.getPermission(permission, playerUniqueId, isAdmin);
+        if(result.isPresent())
+            return result;
 
         Zone zone = this.zone;
-        return zone != null && zone.check(permission, playerUniqueId, isAdmin)
-                || worldContext.check(permission, playerUniqueId, isAdmin);
+        if(zone == null)
+            return result;
+
+        /*
+         * There are two way to check the zone
+         * 1: The chunk owner is the same as the zone owner and the chunk does not have any special member added to it
+         * 2: The chunk owner is different from the zone owner or has special permissions
+         *
+         * Assumptions:
+         * - If the player is not the owner of the chunk so he's not the owner of the zone
+         *
+         * If the player does not a special rank on the chunk that grants this permission we need to check if this
+         * chunk is fully integrated to the zone or not, if it is we need to check the permission directly on the zone
+         */
+        if(isIntegratedToTheZone())
+            return zone.getPermission(permission, playerUniqueId, isAdmin);
+
+        // The public zone public permission is not the same as the chunk public permission
+        //TODO Should it be on the getPublicPermission() of this context or not?
+        return zone.getPublicPermission(permission);
+    }
+
+    public boolean isIntegratedToTheZone()
+    {
+        return getMembers().isEmpty();
     }
 
     /**
