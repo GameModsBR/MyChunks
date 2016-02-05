@@ -115,4 +115,10 @@ public class PlayerName implements Modifiable
     {
         return isGroupAdmins() || isGroupNature();
     }
+
+    @Override
+    public String toString()
+    {
+        return name+" UUID:"+uniqueId;
+    }
 }

@@ -3,10 +3,7 @@ package br.com.gamemods.mychunks;
 import br.com.gamemods.mychunks.data.api.DataStorage;
 import br.com.gamemods.mychunks.data.api.DataStorageException;
 import br.com.gamemods.mychunks.data.binary.BinaryDataStorage;
-import br.com.gamemods.mychunks.data.state.ClaimedChunk;
-import br.com.gamemods.mychunks.data.state.Permission;
-import br.com.gamemods.mychunks.data.state.PlayerName;
-import br.com.gamemods.mychunks.data.state.WildernessContext;
+import br.com.gamemods.mychunks.data.state.*;
 import com.flowpowered.math.vector.Vector3i;
 import com.google.inject.Inject;
 import ninja.leaping.configurate.ConfigurationOptions;
@@ -35,6 +32,7 @@ import org.spongepowered.api.event.world.chunk.LoadChunkEvent;
 import org.spongepowered.api.event.world.chunk.UnloadChunkEvent;
 import org.spongepowered.api.plugin.Plugin;
 import org.spongepowered.api.text.Text;
+import org.spongepowered.api.text.format.TextColors;
 import org.spongepowered.api.util.Tristate;
 import org.spongepowered.api.world.Chunk;
 import org.spongepowered.api.world.Location;
@@ -55,7 +53,7 @@ import static br.com.gamemods.mychunks.data.state.Permission.values;
 public class MyChunks
 {
     private Map<UUID, Map<Vector3i, ClaimedChunk>> claimedChunks = new ConcurrentHashMap<>(1);
-    private Map<UUID, WildernessContext> wildPermissions = new ConcurrentHashMap<>(1);
+    private Map<UUID, WorldFallbackContext> worldContexts = new ConcurrentHashMap<>(1);
     private DataStorage dataStorage;
 
     @Inject
@@ -86,23 +84,26 @@ public class MyChunks
             CommentedConfigurationNode wild = defaultPermissions.getNode("default-world-permissions");
             wild.setComment("The default permissions for new worlds/dimensions that affects unclaimed chunks");
 
-            for(CommentedConfigurationNode parent: Arrays.asList(fallback, wild))
-                for(Permission permission: values())
+            for(int i = 0; i <= 1; i++)
+            {
+                CommentedConfigurationNode parent = i == 0? fallback : wild;
+                for (Permission permission : values())
                 {
                     CommentedConfigurationNode node = parent.getNode(permission.toString().toLowerCase());
-                    boolean def = parent == fallback? permission.isAllowedByDefault() : permission.isAllowedByDefaultOnTheWild();
-                    node.setComment(permission.getDescription()+" [Default:"+ def +"]");
+                    boolean def = i==0 ? permission.isAllowedByDefault() : permission.isAllowedByDefaultOnTheWild();
+                    node.setComment(permission.getDescription() + " [Default:" + def + "]");
 
                     boolean val = node.getBoolean(def);
-                    if(val != def)
+                    if (val != def)
                     {
-                        if(parent == fallback)
+                        if (i==0)
                             permission.setAllowedByDefault(val);
                         else
                             permission.setAllowedByDefaultOnTheWild(val);
                         permission.setModified(false);
                     }
                 }
+            }
 
             try
             {
@@ -158,7 +159,7 @@ public class MyChunks
         }
     }
 
-    private WildernessContext loadWorldContext(World world) throws IOException
+    private WorldFallbackContext loadWorldContext(World world) throws IOException
     {
         Path worldPath = configDir.resolve("world");
         Path configPath = worldPath.resolve(world.getName().replaceAll("[^a-zA-Z0-9-]", "_") + ".conf");
@@ -168,25 +169,49 @@ public class MyChunks
         HoconConfigurationLoader loader = HoconConfigurationLoader.builder().setPath(configPath).build();
         CommentedConfigurationNode main = loader.load(
                 ConfigurationOptions.defaults()
-                .setShouldCopyDefaults(true)
-                .setHeader("Default wild permissions on the world "+world.getName()+" with dimension "+world.getDimension().getName()+" and unique id: "+world.getUniqueId())
+                        .setShouldCopyDefaults(true)
+                        .setHeader("Default wild permissions on the world " + world.getName() + " with dimension " +
+                                world.getDimension().getName() + " and unique id: " + world.getUniqueId())
         );
 
-        CommentedConfigurationNode worldPerms = main.getNode("wild-permissions");
-        worldPerms.setComment("The permissions that affects unclaimed chunks on this world. Null values are inherited from the default-world-permissions declared on the default-permissions.conf file");
+        CommentedConfigurationNode wildPerms = main.getNode("wild-permissions");
+        wildPerms.setComment(
+                "The permissions that affects unclaimed chunks on this world. Null values are inherited from the default-world-permissions declared on the default-permissions.conf file"
+        );
 
-        WildernessContext context = new WildernessContext();
-        for(Permission permission: values())
+        CommentedConfigurationNode defaultPerms = main.getNode("fallback-permissions");
+        defaultPerms.setComment(
+                "The fallback permissions that will be used when a claimed chunk or a zone does not define the permission, this will take priority over the default defined on the defailt-permission.conf file"
+        );
+
+        WorldFallbackContext worldContext = new WorldFallbackContext(world.getUniqueId());
+        for(int i = 0; i <= 1; i++)
         {
-            CommentedConfigurationNode node = worldPerms.getNode(permission.toString().toLowerCase());
-            boolean def = permission.isAllowedByDefaultOnTheWild();
-            node.setComment(permission.getDescription()+" [Default:"+ def +"]");
-
-            if(!node.isVirtual())
+            PublicContext context;
+            CommentedConfigurationNode parentNode;
+            if(i == 0)
             {
-                Object value = node.getValue();
-                if(value instanceof Boolean)
-                    context.setPublicPermission(permission, Tristate.fromBoolean((boolean) value));
+                context = worldContext.getWilderness();
+                parentNode = wildPerms;
+            }
+            else
+            {
+                context = worldContext;
+                parentNode = defaultPerms;
+            }
+
+            for(Permission permission : values())
+            {
+                CommentedConfigurationNode node = parentNode.getNode(permission.toString().toLowerCase());
+                boolean def = permission.isAllowedByDefaultOnTheWild();
+                node.setComment(permission.getDescription() + " [Default:" + def + "]");
+
+                if(!node.isVirtual())
+                {
+                    Object value = node.getValue();
+                    if(value instanceof Boolean)
+                        context.setPublicPermission(permission, Tristate.fromBoolean((boolean) value));
+                }
             }
         }
 
@@ -194,12 +219,13 @@ public class MyChunks
         {
             loader.save(main);
         }
-        catch (Exception e)
+        catch(Exception e)
         {
-            logger.error("Failed to save the world config file for "+world.getName()+" DIM:"+world.getDimension().getName(), e);
+            logger.error("Failed to save the world config file for " + world.getName() + " DIM:" +
+                    world.getDimension().getName(), e);
         }
 
-        return context;
+        return worldContext;
     }
 
     @Listener
@@ -212,7 +238,22 @@ public class MyChunks
                     Location<World> location = player.getLocation();
                     UUID worldId = location.getExtent().getUniqueId();
                     Vector3i chunkPosition = blockToChunk(location.getPosition().toInt());
-                    ClaimedChunk claimedChunk = new ClaimedChunk(worldId, chunkPosition);
+
+                    WorldFallbackContext worldContext = worldContexts.get(worldId);
+                    if(worldContext == null)
+                        try
+                        {
+                            worldContext = loadWorldContext(location.getExtent());
+                        }
+                        catch(IOException e)
+                        {
+                            String reason = "Failed to load the world context for the world "+location.getExtent().getName();
+                            logger.error(reason, e);
+                            player.sendMessage(Text.builder(reason).color(TextColors.RED).build());
+                            return CommandResult.empty();
+                        }
+
+                    ClaimedChunk claimedChunk = new ClaimedChunk(worldContext, chunkPosition);
                     claimedChunk.setOwner(new PlayerName(player.getUniqueId(), player.getName()));
                     getChunkMap(worldId).get().put(chunkPosition, claimedChunk);
                     player.sendMessage(Text.of("The chunk "+chunkPosition+" is now protected"));
@@ -234,10 +275,10 @@ public class MyChunks
             return;
         }
 
-        WildernessContext wild = wildPermissions.get(event.getTargetWorld().getUniqueId());
+        WorldFallbackContext worldContext = worldContexts.get(event.getTargetWorld().getUniqueId());
 
-        boolean canModifyWild = Optional.ofNullable(wild)
-                .flatMap(w->w.getPublicPermission(MODIFY)).orElse(MODIFY.isAllowedByDefaultOnTheWild());
+        boolean canModifyWild = Optional.ofNullable(worldContext)
+                .flatMap(w->w.getWilderness().getPublicPermission(MODIFY)).orElse(MODIFY.isAllowedByDefaultOnTheWild());
 
         Optional<Map<Vector3i, ClaimedChunk>> chunkMap = getChunkMap(event.getTargetWorld());
 
@@ -261,7 +302,7 @@ public class MyChunks
                     return;
                 }
                 else if(!canModifyWild)
-                    break claimedCheck;;
+                    break claimedCheck;
 
                 checkedChunks.add(chunkPosition);
                 logger.info("Chunk modification allowed: "+chunkPosition+" "+event);
@@ -272,10 +313,10 @@ public class MyChunks
 
         if(!canModifyWild)
         {
-            if(wild != null)
-                wild.notifyFailure(MODIFY, player);
+            if(worldContext != null)
+                worldContext.getWilderness().notifyFailure(MODIFY, player);
             else
-                MODIFY.notifyFailure(player,PlayerName.ADMINS);
+                MODIFY.notifyFailure(player,PlayerName.WILDERNESS);
 
             logger.info("Chunk modification cancelled because MODIFY is not allowed on unclaimed chunks");
             event.setCancelled(true);
@@ -297,7 +338,7 @@ public class MyChunks
         claimedChunks.put(uniqueId, new HashMap<>());
         try
         {
-            wildPermissions.put(uniqueId, loadWorldContext(world));
+            worldContexts.put(uniqueId, loadWorldContext(world));
         }
         catch (IOException e)
         {
@@ -311,7 +352,7 @@ public class MyChunks
     {
         logger.info("World unloaded: "+event.getTargetWorld().getName());
         claimedChunks.remove(event.getTargetWorld().getUniqueId());
-        wildPermissions.remove(event.getTargetWorld().getUniqueId());
+        worldContexts.remove(event.getTargetWorld().getUniqueId());
     }
 
     public Optional<ClaimedChunk> getChunkData(Chunk chunk)
@@ -340,6 +381,17 @@ public class MyChunks
         UUID worldId = chunk.getWorld().getUniqueId();
         Vector3i position = chunk.getPosition();
 
+        WorldFallbackContext context = worldContexts.get(worldId);
+        if(context == null)
+        {
+            IllegalStateException exception = new IllegalStateException(
+                    "Failed to find the world context for the world "+chunk.getWorld().getName()
+            );
+            logger.error("An error happened while loading the chunk "+chunk.getWorld().getName()+position, exception);
+            Sponge.getServer().shutdown();
+            throw exception;
+        }
+
         try
         {
             dataStorage.loadChunk(worldId, position).ifPresent(claimedChunk ->{
@@ -349,7 +401,7 @@ public class MyChunks
         } catch (DataStorageException e)
         {
             logger.error("Failed to load chunk information on "+chunk.getWorld().getName()+position, e);
-            getChunkMap(worldId).orElseThrow(IllegalStateException::new).put(position, new ClaimedChunk(worldId, position));
+            getChunkMap(worldId).orElseThrow(IllegalStateException::new).put(position, new ClaimedChunk(context, position));
         }
     }
 

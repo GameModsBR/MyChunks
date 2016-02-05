@@ -45,13 +45,18 @@ public class PublicContext implements Modifiable
      */
     public boolean check(Permission permission, Player player, boolean notify)
     {
-        if(check(permission, player.getUniqueId(), player.hasPermission("mychunks.server-admin")))
+        if(check(permission, player.getUniqueId(), isAdmin(player)))
             return true;
 
         if(notify)
             notifyFailure(permission, player);
 
         return false;
+    }
+
+    public boolean isAdmin(Player player)
+    {
+        return player.hasPermission("mychunks.server-admin");
     }
 
     public void notifyFailure(Permission permission, Player player)
@@ -76,12 +81,34 @@ public class PublicContext implements Modifiable
 
     public boolean check(Permission permission, UUID playerUniqueId, boolean isAdmin)
     {
-        return getPublicPermission(permission).orElse(getDefaultPermission(permission));
+        Optional<Boolean> result = getPermission(permission, playerUniqueId, isAdmin);
+        if(result.isPresent())
+            return result.get();
+
+        return getPublicPermission(permission).orElse(getDefaultPublicPermission(permission));
     }
 
-    protected boolean getDefaultPermission(Permission permission)
+    /**
+     * The
+     * @param permission
+     * @return
+     */
+    protected boolean getDefaultPublicPermission(Permission permission)
     {
         return false;
+    }
+
+    /**
+     * Checks if the player have a custom permission on this context that overrides the public permissions.
+     * @param permission The permission to be checked
+     * @param playerUniqueId The player that needs this permission
+     * @param isAdmin If the player is an adminstrator
+     * @return An optional wrapper that may contains the custom permission. If it's empty the player may still be
+     * allowed by the result of the {@link #getPublicPermission(Permission)}
+     */
+    public Optional<Boolean> getPermission(Permission permission, UUID playerUniqueId, boolean isAdmin)
+    {
+        return Optional.empty();
     }
 
     /**

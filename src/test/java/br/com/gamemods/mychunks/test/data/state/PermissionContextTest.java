@@ -12,14 +12,14 @@ import static org.junit.Assert.*;
 
 public class PermissionContextTest
 {
-    protected PermissionContext context;
+    protected OwnedContext context;
     protected PlayerName owner, builder;
     protected Rank builderRank;
 
     @Before
     public void setUpContext() throws Exception
     {
-        context = new PermissionContext();
+        context = new OwnedContext();
     }
 
     @Before

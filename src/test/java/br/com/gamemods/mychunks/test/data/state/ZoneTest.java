@@ -1,15 +1,15 @@
 package br.com.gamemods.mychunks.test.data.state;
 
-import br.com.gamemods.mychunks.data.state.*;
+import br.com.gamemods.mychunks.data.state.ClaimedChunk;
+import br.com.gamemods.mychunks.data.state.WorldFallbackContext;
+import br.com.gamemods.mychunks.data.state.Zone;
 import com.flowpowered.math.vector.Vector3i;
 import org.hamcrest.BaseMatcher;
 import org.hamcrest.Description;
 import org.junit.Before;
 import org.junit.Test;
-import org.spongepowered.api.util.Tristate;
 
 import javax.naming.InvalidNameException;
-import java.util.EnumSet;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -17,13 +17,15 @@ import static org.junit.Assert.*;
 
 public class ZoneTest extends PermissionContextTest
 {
+    private WorldFallbackContext worldContext;
     private Zone zone1, zone2;
 
     @Before
     public void setUpContext() throws Exception
     {
-        context = zone1 = new Zone(UUID.randomUUID(), "Test Zone A");
-        zone2 = new Zone(zone1.getWorldId(), "Test Zone B");
+        worldContext = new WorldFallbackContext(UUID.randomUUID());
+        context = zone1 = new Zone(worldContext, "Test Zone A");
+        zone2 = new Zone(worldContext, "Test Zone B");
     }
 
     @Test
@@ -77,12 +79,14 @@ public class ZoneTest extends PermissionContextTest
     {
         Vector3i position = new Vector3i(5,0,9);
         UUID worldId = zone1.getWorldId();
-        ClaimedChunk claimedChunk = new ClaimedChunk(worldId, position);
-        ClaimedChunk diagonalChunk = new ClaimedChunk(worldId, new Vector3i(6,0,10));
-        ClaimedChunk crossChunk = new ClaimedChunk(worldId, new Vector3i(4,0,9));
-        ClaimedChunk crossChunk2 = new ClaimedChunk(worldId, new Vector3i(3,0,9));
-        ClaimedChunk farChunk = new ClaimedChunk(worldId, new Vector3i(-10,0,4));
-        ClaimedChunk dimensionalChunk = new ClaimedChunk(UUID.randomUUID(), crossChunk.getPosition());
+        WorldFallbackContext worldContext = new WorldFallbackContext(worldId);
+        ClaimedChunk claimedChunk = new ClaimedChunk(worldContext, position);
+        ClaimedChunk diagonalChunk = new ClaimedChunk(worldContext, new Vector3i(6,0,10));
+        ClaimedChunk crossChunk = new ClaimedChunk(worldContext, new Vector3i(4,0,9));
+        ClaimedChunk crossChunk2 = new ClaimedChunk(worldContext, new Vector3i(3,0,9));
+        ClaimedChunk farChunk = new ClaimedChunk(worldContext, new Vector3i(-10,0,4));
+
+        ClaimedChunk dimensionalChunk = new ClaimedChunk(new WorldFallbackContext(UUID.randomUUID()), crossChunk.getPosition());
 
         // Add
         zone1.addChunk(claimedChunk);

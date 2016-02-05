@@ -1,22 +1,21 @@
 package br.com.gamemods.mychunks.data.state;
 
 import com.flowpowered.math.vector.Vector3i;
-import org.spongepowered.api.entity.living.player.Player;
-import org.spongepowered.api.util.Tristate;
 import org.spongepowered.api.util.annotation.NonnullByDefault;
 
 import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
-import java.util.*;
+import java.util.Objects;
+import java.util.UUID;
 
 /**
  * A chunk that is protected on the server, it can be claimed to a player or to the server admins.
  */
 @ParametersAreNonnullByDefault
 @NonnullByDefault
-public class ClaimedChunk extends PermissionContext
+public class ClaimedChunk extends OwnedContext
 {
-    private final UUID worldId;
+    private final WorldFallbackContext worldContext;
     private final Vector3i position;
 
     @Nullable
@@ -24,12 +23,12 @@ public class ClaimedChunk extends PermissionContext
 
     /**
      * Construct a chunk that is claimed by the server admins, with no members and no public permission specified
-     * @param worldId The world ID that this chunk resides
+     * @param worldContext The world that this chunk resides
      * @param position The chunk position
      */
-    public ClaimedChunk(UUID worldId, Vector3i position)
+    public ClaimedChunk(WorldFallbackContext worldContext, Vector3i position)
     {
-        this.worldId = worldId;
+        this.worldContext = worldContext;
         this.position = position;
     }
 
@@ -45,11 +44,12 @@ public class ClaimedChunk extends PermissionContext
     @Override
     public boolean check(Permission permission, UUID playerUniqueId, boolean isAdmin)
     {
-        if(super.check(permission, playerUniqueId, isAdmin))
+        if (super.check(permission, playerUniqueId, isAdmin))
             return true;
 
         Zone zone = this.zone;
-        return zone != null && zone.check(permission, playerUniqueId);
+        return zone != null && zone.check(permission, playerUniqueId, isAdmin)
+                || worldContext.check(permission, playerUniqueId, isAdmin);
     }
 
     /**
@@ -57,7 +57,7 @@ public class ClaimedChunk extends PermissionContext
      */
     public UUID getWorldId()
     {
-        return worldId;
+        return worldContext.getWorldId();
     }
 
     /**
@@ -90,5 +90,10 @@ public class ClaimedChunk extends PermissionContext
 
         modified |= !Objects.equals(this.zone, zone);
         this.zone = zone;
+    }
+
+    public WorldFallbackContext getWorldContext()
+    {
+        return worldContext;
     }
 }

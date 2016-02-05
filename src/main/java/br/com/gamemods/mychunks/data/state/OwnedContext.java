@@ -9,15 +9,15 @@ import java.util.*;
 
 @ParametersAreNonnullByDefault
 @NonnullByDefault
-public class PermissionContext extends PublicContext implements Modifiable
+public class OwnedContext extends PublicContext implements Modifiable
 {
     private Optional<PlayerName> owner = Optional.empty();
     private Map<UUID, Set<Member>> members = new HashMap<>(0);
 
-    public PermissionContext()
+    public OwnedContext()
     {}
 
-    public PermissionContext(EnumMap<Permission, Boolean> publicPermissions)
+    public OwnedContext(EnumMap<Permission, Boolean> publicPermissions)
     {
         super(publicPermissions);
     }
@@ -28,19 +28,26 @@ public class PermissionContext extends PublicContext implements Modifiable
         permission.notifyFailure(player, owner.orElse(PlayerName.ADMINS));
     }
 
-    public boolean check(Permission permission, UUID playerUniqueId, boolean isAdmin)
+    /**
+     * @param permission
+     * @param playerUniqueId
+     * @param isAdmin
+     * @return
+     */
+    @Override
+    public Optional<Boolean> getPermission(Permission permission, UUID playerUniqueId, boolean isAdmin)
     {
         PlayerName owner = this.owner.orElse(PlayerName.ADMINS);
         if(owner.getUniqueId().equals(playerUniqueId) || isAdmin && owner.equalsPlayer(PlayerName.ADMINS))
-            return true;
+            return Optional.of(true);
 
         Set<Member> memberSet= members.get(playerUniqueId);
         if(memberSet != null)
             for(Member member: memberSet)
                 if(member != null && member.getRank().getPermission(permission).orElse(false))
-                    return true;
+                    return Optional.of(true);
 
-        return super.check(permission, playerUniqueId, isAdmin);
+        return Optional.empty();
     }
 
     /**

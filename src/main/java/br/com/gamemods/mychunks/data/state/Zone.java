@@ -2,13 +2,15 @@ package br.com.gamemods.mychunks.data.state;
 
 import br.com.gamemods.mychunks.Util;
 import com.flowpowered.math.vector.Vector3i;
-import org.spongepowered.api.util.Direction;
 import org.spongepowered.api.util.Identifiable;
 import org.spongepowered.api.util.annotation.NonnullByDefault;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 import javax.naming.InvalidNameException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
 /**
  * <p>A group of claimed chunks that shares the same fallback permissions</p>
@@ -17,10 +19,10 @@ import java.util.*;
  */
 @ParametersAreNonnullByDefault
 @NonnullByDefault
-public class Zone extends PermissionContext implements Identifiable
+public class Zone extends OwnedContext implements Identifiable
 {
     private final UUID zoneId;
-    private final UUID worldId;
+    private final WorldFallbackContext worldContext;
     private String name = "unnamed";
     private Map<Vector3i, ClaimedChunk> chunkMap = new HashMap<>(1);
 
@@ -31,17 +33,17 @@ public class Zone extends PermissionContext implements Identifiable
      *             defined on {@link #setName(String)} then it will be automatically adapted without notification.
      * @throws IllegalArgumentException If the name is empty or contains only empty characters
      */
-    public Zone(UUID zoneId, UUID worldId, String name) throws IllegalArgumentException
+    public Zone(UUID zoneId, WorldFallbackContext worldContext, String name) throws IllegalArgumentException
     {
         this.zoneId = zoneId;
-        this.worldId = worldId;
+        this.worldContext = worldContext;
         setValidName(name);
     }
 
-    public Zone(UUID worldId, String name) throws InvalidNameException
+    public Zone(WorldFallbackContext worldContext, String name) throws InvalidNameException
     {
         this.zoneId = UUID.randomUUID();
-        this.worldId = worldId;
+        this.worldContext = worldContext;
         setName(name);
     }
 
@@ -69,7 +71,7 @@ public class Zone extends PermissionContext implements Identifiable
                     continue;
 
                 if(chunkMap.containsKey(alternativeSupport))
-                    continue lookup;;
+                    continue lookup;
             }
 
             return true;
@@ -93,8 +95,11 @@ public class Zone extends PermissionContext implements Identifiable
 
     public void addChunk(ClaimedChunk chunk) throws IllegalArgumentException
     {
-        if(!chunk.getWorldId().equals(worldId))
-            throw new IllegalArgumentException("The chunk "+chunk.getWorldId()+chunk.getPosition()+" is not part of the world "+worldId);
+        if(!chunk.getWorldId().equals(worldContext.getWorldId()))
+            throw new IllegalArgumentException(
+                    "The chunk "+chunk.getWorldId()+chunk.getPosition()+
+                            " is not part of the world "+worldContext.getWorldId()
+            );
 
         Zone zone = chunk.getZone();
         if(zone == this)
@@ -135,7 +140,7 @@ public class Zone extends PermissionContext implements Identifiable
 
     public UUID getWorldId()
     {
-        return worldId;
+        return worldContext.getWorldId();
     }
 
     public String getName()

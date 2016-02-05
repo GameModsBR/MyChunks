@@ -16,7 +16,7 @@ public class WildernessContext extends PublicContext
     }
 
     @Override
-    protected boolean getDefaultPermission(Permission permission)
+    protected boolean getDefaultPublicPermission(Permission permission)
     {
         return permission.isAllowedByDefaultOnTheWild();
     }
@@ -24,6 +24,6 @@ public class WildernessContext extends PublicContext
     @Override
     public void notifyFailure(Permission permission, Player player)
     {
-        permission.notifyFailure(player, PlayerName.ADMINS);
+        permission.notifyFailure(player, PlayerName.WILDERNESS);
     }
 }
