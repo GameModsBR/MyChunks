@@ -68,7 +68,7 @@ public class BinaryDataStorage implements DataStorage
     @Override
     public void saveChunk(ClaimedChunk chunk)
     {
-
+        //TODO Implement data persistence
     }
 
     /**

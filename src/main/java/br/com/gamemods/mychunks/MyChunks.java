@@ -38,6 +38,7 @@ import org.spongepowered.api.world.Chunk;
 import org.spongepowered.api.world.Location;
 import org.spongepowered.api.world.World;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -84,26 +85,8 @@ public class MyChunks
             CommentedConfigurationNode wild = defaultPermissions.getNode("default-world-permissions");
             wild.setComment("The default permissions for new worlds/dimensions that affects unclaimed chunks");
 
-            for(int i = 0; i <= 1; i++)
-            {
-                CommentedConfigurationNode parent = i == 0? fallback : wild;
-                for (Permission permission : values())
-                {
-                    CommentedConfigurationNode node = parent.getNode(permission.toString().toLowerCase());
-                    boolean def = i==0 ? permission.isAllowedByDefault() : permission.isAllowedByDefaultOnTheWild();
-                    node.setComment(permission.getDescription() + " [Default:" + def + "]");
-
-                    boolean val = node.getBoolean(def);
-                    if (val != def)
-                    {
-                        if (i==0)
-                            permission.setAllowedByDefault(val);
-                        else
-                            permission.setAllowedByDefaultOnTheWild(val);
-                        permission.setModified(false);
-                    }
-                }
-            }
+            loadWorldConfig(null, wild, true);
+            loadWorldConfig(null, fallback, false);
 
             try
             {
@@ -159,6 +142,41 @@ public class MyChunks
         }
     }
 
+    private void loadWorldConfig(@Nullable PublicContext context, CommentedConfigurationNode parentNode, boolean wild)
+    {
+        for(Permission permission : values())
+        {
+            CommentedConfigurationNode node = parentNode.getNode(permission.toString().toLowerCase());
+            boolean def = wild? permission.isAllowedByDefaultOnTheWild() : permission.isAllowedByDefault();
+            node.setComment(permission.getDescription() + " [Default:" + def + "]");
+
+            if(context != null)
+            {
+                if(!node.isVirtual())
+                {
+                    Object value = node.getValue();
+                    if(value instanceof Boolean)
+                    {
+                        context.setPublicPermission(permission, Tristate.fromBoolean((boolean) value));
+                        context.setModified(false);
+                    }
+                }
+            }
+            else
+            {
+                boolean val = node.getBoolean(def);
+                if (val != def)
+                {
+                    if (wild)
+                        permission.setAllowedByDefaultOnTheWild(val);
+                    else
+                        permission.setAllowedByDefault(val);
+                    permission.setModified(false);
+                }
+            }
+        }
+    }
+
     private WorldFallbackContext loadWorldContext(World world) throws IOException
     {
         Path worldPath = configDir.resolve("world");
@@ -185,35 +203,8 @@ public class MyChunks
         );
 
         WorldFallbackContext worldContext = new WorldFallbackContext(world.getUniqueId());
-        for(int i = 0; i <= 1; i++)
-        {
-            PublicContext context;
-            CommentedConfigurationNode parentNode;
-            if(i == 0)
-            {
-                context = worldContext.getWilderness();
-                parentNode = wildPerms;
-            }
-            else
-            {
-                context = worldContext;
-                parentNode = defaultPerms;
-            }
-
-            for(Permission permission : values())
-            {
-                CommentedConfigurationNode node = parentNode.getNode(permission.toString().toLowerCase());
-                boolean def = permission.isAllowedByDefaultOnTheWild();
-                node.setComment(permission.getDescription() + " [Default:" + def + "]");
-
-                if(!node.isVirtual())
-                {
-                    Object value = node.getValue();
-                    if(value instanceof Boolean)
-                        context.setPublicPermission(permission, Tristate.fromBoolean((boolean) value));
-                }
-            }
-        }
+        loadWorldConfig(worldContext, defaultPerms, false);
+        loadWorldConfig(worldContext.getWilderness(), wildPerms, true);
 
         try
         {
