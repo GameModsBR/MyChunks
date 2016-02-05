@@ -65,7 +65,7 @@ public class ClaimedChunk extends OwnedContext
 
     public boolean isIntegratedToTheZone()
     {
-        return getMembers().isEmpty();
+        return zone != null && getMembers().isEmpty() && getOwner().equals(zone.getOwner());
     }
 
     /**

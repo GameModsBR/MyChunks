@@ -5,6 +5,7 @@ import com.flowpowered.math.vector.Vector3i;
 import org.spongepowered.api.util.Identifiable;
 import org.spongepowered.api.util.annotation.NonnullByDefault;
 
+import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
 import javax.naming.InvalidNameException;
 import java.util.HashMap;
@@ -54,7 +55,7 @@ public class Zone extends OwnedContext implements Identifiable
 
     public boolean isChunkRequired(final Vector3i position)
     {
-        if(chunkMap.size() <= 1 || !chunkMap.containsKey(position))
+        if(chunkMap.size() <= 2 || !chunkMap.containsKey(position))
             return false;
 
         lookup:
@@ -186,5 +187,12 @@ public class Zone extends OwnedContext implements Identifiable
     public UUID getUniqueId()
     {
         return zoneId;
+    }
+
+    @Override
+    public void setOwner(@Nullable PlayerName owner) throws UnsupportedOperationException
+    {
+        chunkMap.values().stream().filter(ClaimedChunk::isIntegratedToTheZone).forEach(chunk -> chunk.setOwner(owner));
+        super.setOwner(owner);
     }
 }
