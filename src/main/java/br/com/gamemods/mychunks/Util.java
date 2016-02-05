@@ -7,13 +7,20 @@ import org.spongepowered.api.util.annotation.NonnullByDefault;
 import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.text.Normalizer;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumSet;
 
 @ParametersAreNonnullByDefault
 @NonnullByDefault
 public class Util
 {
+    public static final Collection<Vector3i> CARDINAL_DIRECTIONS = Collections.unmodifiableCollection(Arrays.asList(
+            new Vector3i(-1,0,0),new Vector3i(1,0,0),
+            new Vector3i(0,0,-1),new Vector3i(0,0,-1)
+    ));
+
     public static <E extends Enum<E>> EnumSet<E> enumSet(Class<E> enumClass, @Nullable Collection<E> collection)
     {
         if(collection == null || collection.isEmpty())

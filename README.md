@@ -1,7 +1,7 @@
 # MyChunks
-MyChunks is a chunk protection plugin for Minecraft servers using Sponge. It's just starting to be developped right now so all help is appreciated.
+MyChunks is a chunk protection plugin for Minecraft servers using Sponge. It's just starting to be developed right now so all help is appreciated.
 
-[![Build Status](https://travis-ci.org/GameModsBR/MyChunks.svg?branch=master)](https://travis-ci.org/GameModsBR/MyChunks) [![Code Quality](https://img.shields.io/codacy/6e4a916b46a8493881d709244c977e87/master.svg)](https://www.codacy.com/app/jose-rob-jr/MyChunks/dashboard) [![Maintenance](https://img.shields.io/maintenance/yes/2016.svg)]()
+[![Build Status](https://travis-ci.org/GameModsBR/MyChunks.svg?branch=master)](https://travis-ci.org/GameModsBR/MyChunks) [![Code Quality](https://img.shields.io/codacy/6e4a916b46a8493881d709244c977e87/development.svg)](https://www.codacy.com/app/jose-rob-jr/MyChunks/dashboard) [![Maintenance](https://img.shields.io/maintenance/yes/2016.svg)]()
 
 ## Goals
 * The main goal is to protect chunks from modifications by unauthorized players in all possible ways using permissions.
@@ -13,5 +13,5 @@ MyChunks is a chunk protection plugin for Minecraft servers using Sponge. It's j
 * The protections must be highly optimized for performance
 * All chunk data must be loaded and unloaded with the chunk
 * The data must be saved in binary form without databases
-* An optional database support that uses standartized SQL, so the server owners can use any database.
+* An optional database support that uses standardized SQL, so the server owners can use any database.
 * A way to allow the server owners to change the data storage engine (database or binary) without loosing data.

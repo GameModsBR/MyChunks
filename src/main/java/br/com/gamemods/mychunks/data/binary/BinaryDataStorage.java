@@ -1,13 +1,10 @@
 package br.com.gamemods.mychunks.data.binary;
 
-import static br.com.gamemods.mychunks.Util.*;
-
 import br.com.gamemods.mychunks.data.api.DataStorage;
 import br.com.gamemods.mychunks.data.api.DataStorageException;
 import br.com.gamemods.mychunks.data.state.ClaimedChunk;
 import com.flowpowered.math.vector.Vector2i;
 import com.flowpowered.math.vector.Vector3i;
-import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -15,6 +12,7 @@ import org.spongepowered.api.util.annotation.NonnullByDefault;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -22,11 +20,20 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import static br.com.gamemods.mychunks.Util.chunkToRegion;
+
+/**
+ * Data storage implementation that stores the data as binary files, on the disk.
+ * <p>The data is saved in multiple files organized by directories</p>
+ */
 @NonnullByDefault
 @ParametersAreNonnullByDefault
 public class BinaryDataStorage implements DataStorage
 {
     private final File storageDir;
+
+    // We cache the data to prevent issues with slow IO operations when the same chunk is loaded and unloaded too many times
+    // and when multiple chunks are loaded from the same region too quickly
     private LoadingCache<UUID, WorldData> worldCache = CacheBuilder.newBuilder()
             .expireAfterAccess(15, TimeUnit.MINUTES)
             .build(new CacheLoader<UUID, WorldData>()
@@ -38,9 +45,11 @@ public class BinaryDataStorage implements DataStorage
                 }
             });
 
-    public BinaryDataStorage(File storageDir)
+    public BinaryDataStorage(File storageDir) throws IOException
     {
         this.storageDir = storageDir;
+        if(!storageDir.isDirectory() && !storageDir.mkdirs())
+            throw new IOException("Failed to create the directory "+storageDir);
     }
 
     @Override
@@ -56,6 +65,15 @@ public class BinaryDataStorage implements DataStorage
         }
     }
 
+    @Override
+    public void saveChunk(ClaimedChunk chunk)
+    {
+        //TODO Implement data persistence
+    }
+
+    /**
+     * A cache of all data read about a world
+     */
     private class WorldData
     {
         private final UUID worldId;
@@ -80,6 +98,9 @@ public class BinaryDataStorage implements DataStorage
             return Optional.ofNullable(regionCache.get(chunkToRegion(position)).claimedChunkMap.get(position));
         }
 
+        /**
+         * A cache of all chunks in a region file
+         */
         private class RegionData
         {
             private final Vector2i position;

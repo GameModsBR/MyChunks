@@ -11,26 +11,37 @@ import org.spongepowered.api.util.annotation.NonnullByDefault;
 import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.EnumSet;
-import java.util.Set;
 
 /**
  * The permission flags that are used on protections
  */
 @ParametersAreNonnullByDefault
 @NonnullByDefault
-public enum Permission
+public enum Permission implements Modifiable
 {
     /**
      * Place, break or replace blocks
      */
-    MODIFY("You do not have permission to modify this chunk."),
-    ENTER(true, "You do not have permission to enter on this chunk.")
+    MODIFY("Allows to place/break/change blocks in the protected zone", "You do not have permission to modify this chunk."),
+    ENTER(true, "Allows to be inside the protected zone", "You do not have permission to enter on this chunk.")
 
     ;
 
-    private static EnumSet<Permission> defaultPermissions = EnumSet.noneOf(Permission.class);
+    private static final EnumSet<Permission> defaultPermissions = EnumSet.allOf(Permission.class);
+    private static final EnumSet<Permission> defaultWildPermissions = EnumSet.allOf(Permission.class);
+
+    private boolean fallbackValue = false;
+    private boolean defaultWildValue = false;
+    private Text failureMessage;
+    private String description;
+    private boolean modified;
+
+    static
+    {
+        defaultPermissions.removeIf(permission -> !permission.fallbackValue);
+        defaultWildPermissions.removeIf(permission -> !permission.defaultWildValue);
+    }
 
     /**
      * The permissions that are allowed by default. Changes tn the flags doesn't change sets returned prior the change
@@ -40,6 +51,11 @@ public enum Permission
     public static EnumSet<Permission> getDefaultPermissions()
     {
         return EnumSet.copyOf(defaultPermissions);
+    }
+
+    public static EnumSet<Permission> getDefaultWildPermissions()
+    {
+        return EnumSet.copyOf(defaultWildPermissions);
     }
 
     /**
@@ -52,18 +68,17 @@ public enum Permission
         return Util.enumSet(Permission.class, collection);
     }
 
-    private boolean defaultValue = false;
-    private Text failureMessage;
-
-    /**
-     * Construct a permission specifying a failure message, the message will be formatted following the failure message standard.
-     */
-    Permission(String failureMessage)
+    Permission(String description, String failureMessage)
     {
-        this(false, failureMessage);
+        this(false, true, description, failureMessage);
     }
 
-    Permission(boolean def, String failureMessage)
+    Permission(boolean def, String description, String failureMessage)
+    {
+        this(def, def, description, failureMessage);
+    }
+
+    Permission(boolean def, boolean wild, String description, String failureMessage)
     {
         LiteralText.Builder builder = Text.builder(failureMessage);
         TextColor color = TextColors.RED;
@@ -72,8 +87,11 @@ public enum Permission
         if(color != null)
             builder.color(color);
 
+        this.description = description;
         this.failureMessage = builder.build();
-        this.defaultValue = def;
+        this.fallbackValue = def;
+        this.defaultWildValue = wild;
+        modified = false;
     }
 
     /**
@@ -83,7 +101,7 @@ public enum Permission
      */
     public boolean isAllowedByDefault()
     {
-        return defaultValue;
+        return fallbackValue;
     }
 
     /**
@@ -91,11 +109,27 @@ public enum Permission
      */
     public void setAllowedByDefault(boolean allowed)
     {
-        this.defaultValue = allowed;
+        modified |= fallbackValue != allowed;
+        this.fallbackValue = allowed;
         if(allowed)
             defaultPermissions.add(this);
         else
             defaultPermissions.remove(this);
+    }
+
+    public void setAllowedByDefaultOnTheWild(boolean allowed)
+    {
+        modified |= allowed != defaultWildValue;
+        this.defaultWildValue = allowed;
+        if(allowed)
+            defaultWildPermissions.add(this);
+        else
+            defaultWildPermissions.remove(this);
+    }
+
+    public boolean isAllowedByDefaultOnTheWild()
+    {
+        return defaultWildValue;
     }
 
     /**
@@ -132,5 +166,22 @@ public enum Permission
     private static Text.Builder header()
     {
         return Text.builder("Permission> ");
+    }
+
+    @Override
+    public boolean isModified()
+    {
+        return modified;
+    }
+
+    @Override
+    public void setModified(boolean modified)
+    {
+        this.modified = modified;
+    }
+
+    public String getDescription()
+    {
+        return description;
     }
 }

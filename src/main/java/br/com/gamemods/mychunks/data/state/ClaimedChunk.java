@@ -1,108 +1,71 @@
 package br.com.gamemods.mychunks.data.state;
 
 import com.flowpowered.math.vector.Vector3i;
-import org.spongepowered.api.entity.living.player.Player;
-import org.spongepowered.api.util.Tristate;
 import org.spongepowered.api.util.annotation.NonnullByDefault;
 
 import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
-import java.util.*;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
 
 /**
  * A chunk that is protected on the server, it can be claimed to a player or to the server admins.
  */
 @ParametersAreNonnullByDefault
 @NonnullByDefault
-public class ClaimedChunk
+public class ClaimedChunk extends OwnedContext
 {
-    private final UUID worldId;
+    private final WorldFallbackContext worldContext;
     private final Vector3i position;
-    private PlayerName owner = PlayerName.ADMINS;
-    private Map<UUID, Set<Member>> members = new HashMap<>(0);
-    private EnumMap<Permission, Boolean> publicPermissions;
+
     @Nullable
     private Zone zone;
 
     /**
      * Construct a chunk that is claimed by the server admins, with no members and no public permission specified
-     * @param worldId The world ID that this chunk resides
+     * @param worldContext The world that this chunk resides
      * @param position The chunk position
      */
-    public ClaimedChunk(UUID worldId, Vector3i position)
+    public ClaimedChunk(WorldFallbackContext worldContext, Vector3i position)
     {
-        this.worldId = worldId;
+        this.worldContext = worldContext;
         this.position = position;
-        publicPermissions = new EnumMap<>(Permission.class);
     }
 
-    /**
-     * <p>Checks if this chunks declares an specific permission as public.</p>
-     * Public permissions allows anyone to do this action regardless if the subject is a member or not.
-     * @param permission The permission to be checked
-     * @return {@code true} if it's permitted, {@code false} if it's denied or empty if it's not defined.
-     */
-    public Optional<Boolean> getPublicPermission(Permission permission)
+    @Override
+    public Optional<Boolean> getPermission(Permission permission, UUID playerUniqueId, boolean isAdmin)
     {
-        return Optional.ofNullable(publicPermissions.get(permission));
-    }
-
-    /**
-     * <p>Checks if a player has an specific permission on this chunk.</p>
-     * <p>It checks the player public permissions, the player rank and the zone that this chunk resides.</p>
-     * <p>The player will be notified if the permission is denied</p>
-     * @param permission The permission to be checked
-     * @param player The player that needs this permission
-     * @return If the player has permission
-     */
-    public boolean check(Permission permission, Player player)
-    {
-        return check(permission, player, true);
-    }
-
-    /**
-     * <p>Checks if a player has an specific permission on this chunk.</p>
-     * <p>It checks the player public permissions, the player rank and the zone that this chunk resides.</p>
-     * @param permission The permission to be checked
-     * @param player The player that needs this permission
-     * @param notify If the player should be notified if the permission is denied
-     * @return If the player has permission
-     */
-    public boolean check(Permission permission, Player player, boolean notify)
-    {
-        if(check(permission, player.getUniqueId(), player.hasPermission("mychunks.server-admin")))
-            return true;
-
-        if(notify)
-            permission.notifyFailure(player, owner);
-
-        return false;
-    }
-
-    public boolean check(Permission permission, UUID playerUniqueId)
-    {
-        return check(permission, playerUniqueId, PlayerName.ADMINS.equalsPlayer(playerUniqueId));
-    }
-
-    public boolean check(Permission permission, UUID playerUniqueId, boolean isAdmin)
-    {
-        if(owner.getUniqueId().equals(playerUniqueId))
-            return true;
-
-        if(owner.equalsPlayer(PlayerName.ADMINS) && isAdmin)
-            return true;
-
-        Set<Member> memberSet= members.get(playerUniqueId);
-        if(memberSet != null)
-            for(Member member: memberSet)
-                if(member != null && member.getRank().getPermission(permission).orElse(false))
-                    return true;
-
-        if(getPublicPermission(permission).orElse(false))
-            return true;
+        Optional<Boolean> result = super.getPermission(permission, playerUniqueId, isAdmin);
+        if(result.isPresent())
+            return result;
 
         Zone zone = this.zone;
-        return zone != null && zone.check(permission, playerUniqueId);
+        if(zone == null)
+            return result;
+
+        /*
+         * There are two way to check the zone
+         * 1: The chunk owner is the same as the zone owner and the chunk does not have any special member added to it
+         * 2: The chunk owner is different from the zone owner or has special permissions
+         *
+         * Assumptions:
+         * - If the player is not the owner of the chunk so he's not the owner of the zone
+         *
+         * If the player does not a special rank on the chunk that grants this permission we need to check if this
+         * chunk is fully integrated to the zone or not, if it is we need to check the permission directly on the zone
+         */
+        if(isIntegratedToTheZone())
+            return zone.getPermission(permission, playerUniqueId, isAdmin);
+
+        // The public zone public permission is not the same as the chunk public permission
+        //TODO Should it be on the getPublicPermission() of this context or not?
+        return zone.getPublicPermission(permission);
+    }
+
+    public boolean isIntegratedToTheZone()
+    {
+        return zone != null && getMembers().isEmpty() && getOwner().equals(zone.getOwner());
     }
 
     /**
@@ -110,7 +73,7 @@ public class ClaimedChunk
      */
     public UUID getWorldId()
     {
-        return worldId;
+        return worldContext.getWorldId();
     }
 
     /**
@@ -119,23 +82,6 @@ public class ClaimedChunk
     public Vector3i getPosition()
     {
         return position;
-    }
-
-    /**
-     * The owner of this chunk, note that it can also be a fake player like {@link PlayerName#ADMINS}.
-     */
-    public PlayerName getOwner()
-    {
-        return owner;
-    }
-
-    /**
-     * Changes the owner of this chunk, the change is not persisted immediately
-     * @param owner The new owner, can be a fake player but can't be null
-     */
-    public void setOwner(PlayerName owner)
-    {
-        this.owner = owner;
     }
 
     /**
@@ -158,37 +104,12 @@ public class ClaimedChunk
         if(zone != null && zone.getChunkAt(position).orElse(null) != this)
             throw new IllegalArgumentException("The zone "+zone.getName()+" does not contains this chunk "+position);
 
+        modified |= !Objects.equals(this.zone, zone);
         this.zone = zone;
     }
 
-    public void addMember(Member member)
+    public WorldFallbackContext getWorldContext()
     {
-        UUID playerId = member.getPlayerId().getUniqueId();
-        Set<Member> memberSet = members.get(playerId);
-        if(memberSet == null) members.put(playerId, memberSet = new HashSet<>(1));
-        memberSet.add(member);
-    }
-
-    public boolean removeMember(Member member)
-    {
-        UUID playerId = member.getPlayerId().getUniqueId();
-        Set<Member> memberSet = members.get(playerId);
-        if(memberSet == null)
-            return false;
-        boolean modified = memberSet.remove(member);
-        if(memberSet.isEmpty())
-            modified |= members.remove(playerId) != null;
-
-        return modified;
-    }
-
-    public boolean setPublicPermission(Permission permission, Tristate value)
-    {
-        if(value == Tristate.UNDEFINED)
-            return publicPermissions.remove(permission) != null;
-
-        boolean bool = value.asBoolean();
-        Boolean replacement = publicPermissions.put(permission, bool);
-        return replacement == null || bool != replacement;
+        return worldContext;
     }
 }

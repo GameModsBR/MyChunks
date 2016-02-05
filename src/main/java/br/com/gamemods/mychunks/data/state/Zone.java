@@ -3,13 +3,15 @@ package br.com.gamemods.mychunks.data.state;
 import br.com.gamemods.mychunks.Util;
 import com.flowpowered.math.vector.Vector3i;
 import org.spongepowered.api.util.Identifiable;
-import org.spongepowered.api.util.Tristate;
 import org.spongepowered.api.util.annotation.NonnullByDefault;
 
 import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
 import javax.naming.InvalidNameException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
 /**
  * <p>A group of claimed chunks that shares the same fallback permissions</p>
@@ -18,16 +20,12 @@ import java.util.*;
  */
 @ParametersAreNonnullByDefault
 @NonnullByDefault
-public class Zone implements Identifiable
+public class Zone extends OwnedContext implements Identifiable
 {
     private final UUID zoneId;
-    private final UUID worldId;
-    private String name;
-    @Nullable
-    private PlayerName owner;
+    private final WorldFallbackContext worldContext;
+    private String name = "unnamed";
     private Map<Vector3i, ClaimedChunk> chunkMap = new HashMap<>(1);
-    private EnumMap<Permission, Boolean> publicPermissionsMap = new EnumMap<>(Permission.class);
-    private Map<UUID, Set<Member>> members = new HashMap<>(0);
 
     /**
      * Construct a zone instance with a specified UUID, this constructor is normally used to load a persisted zone.
@@ -36,17 +34,17 @@ public class Zone implements Identifiable
      *             defined on {@link #setName(String)} then it will be automatically adapted without notification.
      * @throws IllegalArgumentException If the name is empty or contains only empty characters
      */
-    public Zone(UUID zoneId, UUID worldId, String name) throws IllegalArgumentException
+    public Zone(UUID zoneId, WorldFallbackContext worldContext, String name) throws IllegalArgumentException
     {
         this.zoneId = zoneId;
-        this.worldId = worldId;
+        this.worldContext = worldContext;
         setValidName(name);
     }
 
-    public Zone(UUID worldId, String name) throws InvalidNameException
+    public Zone(WorldFallbackContext worldContext, String name) throws InvalidNameException
     {
         this.zoneId = UUID.randomUUID();
-        this.worldId = worldId;
+        this.worldContext = worldContext;
         setName(name);
     }
 
@@ -55,15 +53,55 @@ public class Zone implements Identifiable
         return Optional.ofNullable(chunkMap.get(position));
     }
 
-    public void removeChunkAt(Vector3i position)
+    public boolean isChunkRequired(final Vector3i position)
     {
+        if(chunkMap.size() <= 2 || !chunkMap.containsKey(position))
+            return false;
+
+        lookup:
+        for(Vector3i direction: Util.CARDINAL_DIRECTIONS)
+        {
+            Vector3i supported = position.add(direction);
+            if(!chunkMap.containsKey(supported))
+                continue;
+
+            for(Vector3i secondDirection: Util.CARDINAL_DIRECTIONS)
+            {
+                Vector3i alternativeSupport = supported.add(secondDirection);
+                if(alternativeSupport.equals(position))
+                    continue;
+
+                if(chunkMap.containsKey(alternativeSupport))
+                    continue lookup;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    public void removeChunkAt(Vector3i position) throws IllegalArgumentException
+    {
+        if(isChunkRequired(position))
+            throw new IllegalArgumentException("The chunk "+position+" is required by an other chunk");
+
         ClaimedChunk removed = chunkMap.remove(position);
         if(removed != null)
+        {
             removed.setZone(null);
+            modified = true;
+        }
     }
 
     public void addChunk(ClaimedChunk chunk) throws IllegalArgumentException
     {
+        if(!chunk.getWorldId().equals(worldContext.getWorldId()))
+            throw new IllegalArgumentException(
+                    "The chunk "+chunk.getWorldId()+chunk.getPosition()+
+                            " is not part of the world "+worldContext.getWorldId()
+            );
+
         Zone zone = chunk.getZone();
         if(zone == this)
             return;
@@ -72,6 +110,7 @@ public class Zone implements Identifiable
         if(zone != null)
             zone.removeChunkAt(addedPosition);
 
+        check:
         if(!chunkMap.isEmpty())
         {
             chunkIteration:
@@ -88,8 +127,8 @@ public class Zone implements Identifiable
                         else one = true;
                     }
 
-                chunkMap.put(addedPosition, chunk);
-                return;
+                if(one)
+                    break check;
             }
 
             throw new IllegalArgumentException("The chunk "+addedPosition+" is not touching any of these chunks: "+chunkMap.keySet());
@@ -97,60 +136,12 @@ public class Zone implements Identifiable
 
         chunkMap.put(addedPosition, chunk);
         chunk.setZone(this);
-    }
-
-    public boolean check(Permission permission, UUID playerUniqueId)
-    {
-        PlayerName owner = this.owner;
-        if(owner != null && owner.getUniqueId().equals(playerUniqueId))
-            return true;
-
-        Set<Member> memberSet = members.get(playerUniqueId);
-        if(memberSet != null)
-            for(Member member: memberSet)
-                if(member != null && member.getRank().getPermission(permission).orElse(false))
-                    return true;
-
-        return getPublicPermission(permission).orElse(permission.isAllowedByDefault());
-    }
-
-    public void addMember(Member member)
-    {
-        UUID playerId = member.getPlayerId().getUniqueId();
-        Set<Member> memberSet = members.get(playerId);
-        if(memberSet == null) members.put(playerId, memberSet = new HashSet<>(1));
-        memberSet.add(member);
-    }
-
-    public boolean setPublicPermission(Permission permission, Tristate value)
-    {
-        if(value == Tristate.UNDEFINED)
-            return publicPermissionsMap.remove(permission) != null;
-
-        boolean bool = value.asBoolean();
-        Boolean replacement = publicPermissionsMap.put(permission, bool);
-        return replacement == null || bool != replacement;
-    }
-
-    public Optional<Boolean> getPublicPermission(Permission permission)
-    {
-        return Optional.ofNullable(publicPermissionsMap.get(permission));
+        modified = true;
     }
 
     public UUID getWorldId()
     {
-        return worldId;
-    }
-
-    @Nullable
-    public PlayerName getOwner()
-    {
-        return owner;
-    }
-
-    public void setOwner(@Nullable PlayerName owner)
-    {
-        this.owner = owner;
+        return worldContext.getWorldId();
     }
 
     public String getName()
@@ -178,6 +169,7 @@ public class Zone implements Identifiable
         String normalized = Util.normalizeIdentifier(name);
         if(normalized.isEmpty()) name = "Unnamed Zone "+System.currentTimeMillis();
 
+        modified |= !this.name.equals(name);
         this.name = name;
         return name;
     }
@@ -187,6 +179,8 @@ public class Zone implements Identifiable
         if(!name.trim().equals(name)) throw new InvalidNameException("Name has trailing or leading whitespace");
         String normalized = Util.normalizeIdentifier(name);
         if(normalized.isEmpty()) throw new InvalidNameException("Normalized name is empty");
+
+        modified |= !this.name.equals(name);
         this.name = name;
     }
 
@@ -195,16 +189,10 @@ public class Zone implements Identifiable
         return zoneId;
     }
 
-    public boolean removeMember(Member member)
+    @Override
+    public void setOwner(@Nullable PlayerName owner) throws UnsupportedOperationException
     {
-        UUID playerId = member.getPlayerId().getUniqueId();
-        Set<Member> memberSet = members.get(playerId);
-        if(memberSet == null)
-            return false;
-        boolean modified = memberSet.remove(member);
-        if(memberSet.isEmpty())
-            modified |= members.remove(playerId) != null;
-
-        return modified;
+        chunkMap.values().stream().filter(ClaimedChunk::isIntegratedToTheZone).forEach(chunk -> chunk.setOwner(owner));
+        super.setOwner(owner);
     }
 }

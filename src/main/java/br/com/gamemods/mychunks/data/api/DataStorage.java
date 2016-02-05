@@ -13,4 +13,5 @@ import java.util.UUID;
 public interface DataStorage
 {
     Optional<ClaimedChunk> loadChunk(UUID worldId, Vector3i position) throws DataStorageException;
+    void saveChunk(ClaimedChunk chunk);
 }

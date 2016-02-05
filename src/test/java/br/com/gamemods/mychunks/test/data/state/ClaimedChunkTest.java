@@ -3,63 +3,117 @@ package br.com.gamemods.mychunks.test.data.state;
 import br.com.gamemods.mychunks.data.state.*;
 import com.flowpowered.math.vector.Vector3i;
 import org.junit.Before;
+import org.junit.FixMethodOrder;
 import org.junit.Test;
-import org.spongepowered.api.util.Tristate;
+import org.junit.runners.MethodSorters;
 
-import java.util.EnumSet;
 import java.util.UUID;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-public class ClaimedChunkTest
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
+public class ClaimedChunkTest extends PermissionContextTest
 {
-    ClaimedChunk chunk;
+    private ClaimedChunk integratedChunk;
+    private ClaimedChunk soldChunk;
+    private Zone zone;
+    private PlayerName zoneOwner;
+    private Member zoneBuilder;
+
     @Before
-    public void setUp() throws Exception
+    public void setUpContext() throws Exception
     {
-        chunk = new ClaimedChunk(UUID.randomUUID(), new Vector3i(380, 0 , -568));
+        zoneOwner = new PlayerName(UUID.randomUUID(), "Zone Owner");
+        zoneBuilder = new Member(new PlayerName(UUID.randomUUID(), "Zone Builder"), builderRank);
+
+        WorldFallbackContext world = new WorldFallbackContext(UUID.randomUUID());
+
+        context = integratedChunk = new ClaimedChunk(world, new Vector3i(380, 0, -568));
+        integratedChunk.setOwner(zoneOwner);
+
+        soldChunk = new ClaimedChunk(world, new Vector3i(381, 0, -568));
+        soldChunk.setOwner(new PlayerName(UUID.randomUUID(), "Buyer"));
+
+        zone = new Zone(integratedChunk.getWorldContext(), "Test Zone");
+        zone.setOwner(zoneOwner);
+        zone.addChunk(integratedChunk);
+        zone.addChunk(soldChunk);
     }
 
     @Test
-    public void testMembersAndPermissions() throws Exception
+    public void testAZoneOwner() throws Exception
     {
-        PlayerName owner = new PlayerName(UUID.randomUUID(), "Player Owner");
-        assertFalse(chunk.check(Permission.MODIFY, owner.getUniqueId()));
+        assertTrue("The owner of the zone have modify permission on a fully integrated chunk",
+                integratedChunk.check(Permission.MODIFY, zoneOwner)
+        );
+        assertFalse("The owner of the zone does not have modify permission on a sold chunk",
+                soldChunk.check(Permission.MODIFY, zoneOwner)
+        );
 
-        chunk.setOwner(owner);
-        assertEquals(chunk.getOwner(), owner);
-        assertTrue(chunk.check(Permission.MODIFY, owner.getUniqueId()));
+        zone.setOwner(null);
+        assertFalse("The ex-zone owner does not have modify permission on a fully integrated chunk anymore",
+                integratedChunk.check(Permission.MODIFY, zoneOwner)
+        );
+        assertFalse("The ex-zone owner still does not have modify permission on a sold chunk",
+                soldChunk.check(Permission.MODIFY, zoneOwner)
+        );
 
-        Rank builderRank = new Rank("builder", EnumSet.of(Permission.MODIFY));
-        PlayerName builder = new PlayerName(UUID.randomUUID(), "Player Builder");
-        assertFalse(chunk.check(Permission.MODIFY, builder.getUniqueId()));
+        zone.setOwner(zoneOwner);
+        assertTrue("The owner of the zone regained modify permission on a fully integrated chunk",
+                integratedChunk.check(Permission.MODIFY, zoneOwner)
+        );
+        assertFalse("The owner still does not have modify permission on a sold chunk after restoring the zone owner position",
+                soldChunk.check(Permission.MODIFY, zoneOwner)
+        );
+    }
 
-        Member member = new Member(builder, builderRank);
-        chunk.addMember(member);
-        assertTrue(chunk.check(Permission.MODIFY, builder.getUniqueId()));
-        assertTrue(chunk.removeMember(member));
-        assertFalse(chunk.check(Permission.MODIFY, builder.getUniqueId()));
+    @Test
+    public void testBZoneMember() throws Exception
+    {
+        PlayerName builder = zoneBuilder.getPlayerId();
+        assertFalse("The test subject does not have modify permission on the integrated chunk",
+                integratedChunk.check(Permission.MODIFY, builder)
+        );
+        assertFalse("The test subject does not have modify permission on the sold chunk",
+                soldChunk.check(Permission.MODIFY, builder)
+        );
 
-        chunk.setOwner(PlayerName.ADMINS);
-        assertFalse(chunk.check(Permission.MODIFY, owner.getUniqueId()));
+        zone.addMember(zoneBuilder);
+        assertTrue("A zone builder has modify permission on a fully integrated chunk",
+                integratedChunk.check(Permission.MODIFY, builder)
+        );
+        assertFalse("A zone builder does not have modify permission on a sold chunk",
+                soldChunk.check(Permission.MODIFY, builder)
+        );
 
-        assertTrue(chunk.setPublicPermission(Permission.MODIFY, Tristate.TRUE));
-        assertTrue(chunk.check(Permission.MODIFY, owner.getUniqueId()));
-        assertTrue(chunk.check(Permission.MODIFY, builder.getUniqueId()));
+        zone.removeChunkAt(integratedChunk.getPosition());
+        assertFalse("A zone builder does not have permission on a chunk that was removed from the zone",
+                integratedChunk.check(Permission.MODIFY, builder)
+        );
 
-        assertTrue(chunk.setPublicPermission(Permission.ENTER, Tristate.FALSE));
-        assertFalse(chunk.setPublicPermission(Permission.ENTER, Tristate.FALSE));
-        assertFalse(chunk.check(Permission.ENTER, owner.getUniqueId()));
-        assertFalse(chunk.check(Permission.ENTER, builder.getUniqueId()));
+        zone.addChunk(integratedChunk);
+        assertTrue("A zone builder regains modify permission on a fully integrated chunk that was re-added to the zone",
+                integratedChunk.check(Permission.MODIFY, builder)
+        );
 
-        assertTrue(chunk.setPublicPermission(Permission.ENTER, Tristate.UNDEFINED));
-        assertFalse(chunk.setPublicPermission(Permission.ENTER, Tristate.UNDEFINED));
-        assertTrue(chunk.check(Permission.MODIFY, owner.getUniqueId()));
-        assertTrue(chunk.check(Permission.MODIFY, builder.getUniqueId()));
+        // New member instance created intentionally for testing
+        zone.removeMember(new Member(builder, builderRank));
+        assertFalse("An ex-builder of the zone does not have modify permission on a fully integrated chunk",
+                integratedChunk.check(Permission.MODIFY, builder)
+        );
 
-        assertTrue(chunk.setPublicPermission(Permission.MODIFY, Tristate.UNDEFINED));
-        assertFalse(chunk.setPublicPermission(Permission.MODIFY, Tristate.UNDEFINED));
-        assertFalse(chunk.check(Permission.MODIFY, owner.getUniqueId()));
-        assertFalse(chunk.check(Permission.MODIFY, builder.getUniqueId()));
+        zone.addMember(zoneBuilder);
+        assertTrue("A zone builder regained modify permission on a fully integrated chunk",
+                integratedChunk.check(Permission.MODIFY, builder)
+        );
+        assertFalse("A zone builder did not gain modify permission on a sold chunk",
+                soldChunk.check(Permission.MODIFY, builder)
+        );
+
+        zone.removeChunkAt(integratedChunk.getPosition());
+        assertFalse("An ex-builder of the zone does not have modify permission on a integrated chunk",
+                integratedChunk.check(Permission.MODIFY, builder)
+        );
     }
 }
