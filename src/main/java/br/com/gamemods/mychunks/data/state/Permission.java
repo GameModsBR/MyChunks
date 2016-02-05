@@ -30,6 +30,13 @@ public enum Permission implements Modifiable
 
     private static final EnumSet<Permission> defaultPermissions = EnumSet.allOf(Permission.class);
     private static final EnumSet<Permission> defaultWildPermissions = EnumSet.allOf(Permission.class);
+
+    private boolean fallbackValue = false;
+    private boolean defaultWildValue = false;
+    private Text failureMessage;
+    private String description;
+    private boolean modified;
+
     static
     {
         defaultPermissions.removeIf(permission -> !permission.fallbackValue);
@@ -60,12 +67,6 @@ public enum Permission implements Modifiable
     {
         return Util.enumSet(Permission.class, collection);
     }
-
-    private boolean fallbackValue = false;
-    private boolean defaultWildValue = false;
-    private Text failureMessage;
-    private String description;
-    private boolean modified;
 
     Permission(String description, String failureMessage)
     {

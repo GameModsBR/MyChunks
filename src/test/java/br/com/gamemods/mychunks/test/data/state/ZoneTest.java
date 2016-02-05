@@ -17,13 +17,12 @@ import static org.junit.Assert.*;
 
 public class ZoneTest extends PermissionContextTest
 {
-    private WorldFallbackContext worldContext;
     private Zone zone1, zone2;
 
     @Before
     public void setUpContext() throws Exception
     {
-        worldContext = new WorldFallbackContext(UUID.randomUUID());
+        WorldFallbackContext worldContext = new WorldFallbackContext(UUID.randomUUID());
         context = zone1 = new Zone(worldContext, "Test Zone A");
         zone2 = new Zone(worldContext, "Test Zone B");
     }
