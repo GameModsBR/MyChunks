@@ -1,7 +1,7 @@
 # MyChunks
 MyChunks is a chunk protection plugin for Minecraft servers using Sponge. It's just starting to be developped right now so all help is appreciated.
 
-[![Build Status](https://img.shields.io/travis/GameModsBR/MyChunks/master.svg)](https://travis-ci.org/GameModsBR/MyChunks) [![Code Quality](https://img.shields.io/codacy/6e4a916b46a8493881d709244c977e87/master.svg)](https://www.codacy.com/app/jose-rob-jr/MyChunks/dashboard) [![Maintenance](https://img.shields.io/maintenance/yes/2016.svg)]()
+[![Build Status](https://travis-ci.org/GameModsBR/MyChunks.svg?branch=master)](https://travis-ci.org/GameModsBR/MyChunks) [![Code Quality](https://img.shields.io/codacy/6e4a916b46a8493881d709244c977e87/master.svg)](https://www.codacy.com/app/jose-rob-jr/MyChunks/dashboard) [![Maintenance](https://img.shields.io/maintenance/yes/2016.svg)]()
 
 ## Goals
 * The main goal is to protect chunks from modifications by unauthorized players in all possible ways using permissions.
