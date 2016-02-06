@@ -1,5 +1,6 @@
 package br.com.gamemods.mychunks;
 
+import br.com.gamemods.mychunks.cmd.GlobalCommands;
 import br.com.gamemods.mychunks.data.api.DataStorage;
 import br.com.gamemods.mychunks.data.api.DataStorageException;
 import br.com.gamemods.mychunks.data.binary.BinaryDataStorage;
@@ -13,7 +14,6 @@ import ninja.leaping.configurate.loader.ConfigurationLoader;
 import org.slf4j.Logger;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.block.BlockSnapshot;
-import org.spongepowered.api.command.CommandResult;
 import org.spongepowered.api.command.spec.CommandSpec;
 import org.spongepowered.api.config.ConfigDir;
 import org.spongepowered.api.config.DefaultConfig;
@@ -32,10 +32,8 @@ import org.spongepowered.api.event.world.chunk.LoadChunkEvent;
 import org.spongepowered.api.event.world.chunk.UnloadChunkEvent;
 import org.spongepowered.api.plugin.Plugin;
 import org.spongepowered.api.text.Text;
-import org.spongepowered.api.text.format.TextColors;
 import org.spongepowered.api.util.Tristate;
 import org.spongepowered.api.world.Chunk;
-import org.spongepowered.api.world.Location;
 import org.spongepowered.api.world.World;
 
 import javax.annotation.Nullable;
@@ -222,38 +220,30 @@ public class MyChunks
     @Listener
     public void onServerStarting(GameStartingServerEvent event)
     {
-        CommandSpec spec = CommandSpec.builder()
-                .description(Text.of("Claims the chunk that you standing"))
-                .executor((src, args) -> {
-                    Player player = (Player) src;
-                    Location<World> location = player.getLocation();
-                    UUID worldId = location.getExtent().getUniqueId();
-                    Vector3i chunkPosition = blockToChunk(location.getPosition().toInt());
+        GlobalCommands globalCommands = new GlobalCommands(this);
+        CommandSpec map = CommandSpec.builder()
+            .description(Text.of("All commands related to the chunk protection"))
+            .executor(globalCommands::map)
+            .build();
 
-                    WorldFallbackContext worldContext = worldContexts.get(worldId);
-                    if(worldContext == null)
-                        try
-                        {
-                            worldContext = loadWorldContext(location.getExtent());
-                        }
-                        catch(IOException e)
-                        {
-                            String reason = "Failed to load the world context for the world "+location.getExtent().getName();
-                            logger.error(reason, e);
-                            player.sendMessage(Text.builder(reason).color(TextColors.RED).build());
-                            return CommandResult.empty();
-                        }
+        CommandSpec claim = CommandSpec.builder()
+                .description(Text.of("Claims the chunk that you are standing"))
+                .executor(globalCommands::claim)
+                .build();
 
-                    ClaimedChunk claimedChunk = new ClaimedChunk(worldContext, chunkPosition);
-                    claimedChunk.setOwner(new PlayerName(player.getUniqueId(), player.getName()));
-                    getChunkMap(worldId).get().put(chunkPosition, claimedChunk);
-                    player.sendMessage(Text.of("The chunk "+chunkPosition+" is now protected"));
-                    return CommandResult.success();
-                })
-                .build()
-        ;
+        CommandSpec chunk = CommandSpec.builder()
+                .description(Text.of("Commands related to chunk protection"))
+                .child(map, "map")
+                .child(claim, "claim")
+                .build();
 
-        Sponge.getCommandManager().register(this, spec, "claim");
+        CommandSpec mychunk = CommandSpec.builder()
+                .description(Text.of("All mychunk commands"))
+                .child(chunk, "chunk", "c")
+                .build();
+
+        Sponge.getCommandManager().register(this, chunk, "chunk");
+        Sponge.getCommandManager().register(this, mychunk, "mychunk");
     }
 
     @Listener
@@ -357,7 +347,7 @@ public class MyChunks
         return getChunkMap(world.getUniqueId());
     }
 
-    private Optional<Map<Vector3i, ClaimedChunk>> getChunkMap(UUID worldId)
+    public Optional<Map<Vector3i, ClaimedChunk>> getChunkMap(UUID worldId)
     {
         Map<Vector3i, ClaimedChunk> subMap = claimedChunks.get(worldId);
         if(subMap == null)
@@ -405,5 +395,10 @@ public class MyChunks
             if(chunkMap.remove(position) != null)
                 logger.info("Chunk unloaded: "+chunk.getWorld().getName()+position);
         } );
+    }
+
+    public Optional<WorldFallbackContext> getWorldContext(UUID worldId)
+    {
+        return Optional.ofNullable(worldContexts.get(worldId));
     }
 }

@@ -162,16 +162,16 @@ public class Zone extends OwnedContext implements Identifiable
      */
     public String setValidName(String name) throws IllegalArgumentException
     {
-        name = name.trim();
-        if(name.isEmpty())
+        String valid = name.trim();
+        if(valid.isEmpty())
             throw new IllegalArgumentException("Name is empty");
 
-        String normalized = Util.normalizeIdentifier(name);
-        if(normalized.isEmpty()) name = "Unnamed Zone "+System.currentTimeMillis();
+        String normalized = Util.normalizeIdentifier(valid);
+        if(normalized.isEmpty()) valid = "Unnamed Zone "+System.currentTimeMillis();
 
-        modified |= !this.name.equals(name);
-        this.name = name;
-        return name;
+        modified |= !this.name.equals(valid);
+        this.name = valid;
+        return valid;
     }
 
     public void setName(String name) throws InvalidNameException
